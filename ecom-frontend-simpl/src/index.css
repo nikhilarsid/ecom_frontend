@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Custom Design Utilities */
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+body {
+  background-color: #FDFDFD;
+  color: #18181B;
+  /* Ensure Inter is applied globally */
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
