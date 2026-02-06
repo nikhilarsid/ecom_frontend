@@ -38,46 +38,77 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
+      
       const data = await res.json();
+
       if (data.token) {
+        // Essential authentication data
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role);
-        localStorage.setItem('userName', data.firstName);
+
+        /**
+         * FIX: Since data.email is not returned by the API, we use formData.email.
+         * This ensures the Merchant Dashboard and Analytics APIs have the 
+         * required identifier to fetch stats.
+         */
+        localStorage.setItem('userName', formData.email); 
         
-        // Redirect based on role
-        data.role === 'MERCHANT' ? navigate('/merchant/dashboard') : navigate('/');
+        // Store the first name for the "Hi, Alice" greeting
+        // Fallback to "User" if data.firstName is also missing
+        localStorage.setItem('firstName', data.firstName || "User");
+        
+        // Redirect logic based on role
+        if (data.role === 'MERCHANT') {
+          navigate('/merchant/dashboard');
+        } else {
+          navigate('/');
+        }
+
+        // Trigger navbar/layout refresh
         window.dispatchEvent(new Event("authChange"));
       } else {
         alert("Login failed. Check credentials.");
       }
     } catch (e) {
       console.error(e);
-    } finally { setLoading(false); }
+      alert("An error occurred. Please try again.");
+    } finally { 
+      setLoading(false);
+    }
   };
 
   return (
     <AuthContainer>
-      <h1 className="text-3xl font-black tracking-tighter mb-2 italic">WELCOME BACK</h1>
+      <h1 className="text-3xl font-black tracking-tighter mb-2 italic uppercase">Welcome Back</h1>
       <p className="text-zinc-400 text-sm mb-8 font-medium">Enter your details to access Ethereal.</p>
       
       <form onSubmit={handleLogin}>
         <Input 
           type="email" 
           placeholder="Email Address" 
+          autoComplete="email"
+          value={formData.email}
           onChange={e => setFormData({...formData, email: e.target.value})} 
           required 
         />
         <Input 
           type="password" 
           placeholder="Password" 
+          autoComplete="current-password"
+          value={formData.password}
           onChange={e => setFormData({...formData, password: e.target.value})} 
           required 
         />
+        
         <button 
           disabled={loading}
           className="w-full bg-black text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-80 transition-all mt-4"
         >
-          {loading ? <Loader2 className="animate-spin" size={18} /> : <>Login <ArrowRight size={16}/></>}
+          {loading ? (
+            <Loader2 className="animate-spin" size={18} />
+          ) : (
+            <>Login <ArrowRight size={16}/></>
+          )}
         </button>
       </form>
       

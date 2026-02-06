@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import styled from "styled-components";
-import { Package, Plus, BarChart3, LayoutGrid } from "lucide-react";
+import { Plus, Loader2, DollarSign, ShoppingBag, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ProductService, { ProductListItem } from "../services/ProductService";
 
@@ -22,6 +22,8 @@ const StatCard = styled.div`
   padding: 32px;
   border-radius: 24px;
   border: 1px solid #f1f1f1;
+  position: relative;
+  overflow: hidden;
 
   span {
     font-size: 10px;
@@ -29,24 +31,68 @@ const StatCard = styled.div`
     color: #a1a1aa;
     letter-spacing: 2px;
     text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
   }
   h2 {
     font-size: 32px;
     font-weight: 900;
-    margin-top: 8px;
     letter-spacing: -1px;
+    color: #000;
   }
 `;
 
 export default function MerchantHome() {
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName");
+  // Ensure merchantId is assigned the email address stored in localStorage
+  const merchantId = localStorage.getItem("userName"); 
+
   const [products, setProducts] = useState<ProductListItem[]>([]);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [totalOrders, setTotalOrders] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  const getHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
+  const fetchMerchantStats = async () => {
+    if (!merchantId) return;
+    
+    console.log(`[DEBUG] Requesting stats for Merchant Email: ${merchantId}`);
+
+    try {
+      // Fetch Total Revenue
+      const revRes = await fetch(
+        `https://order-service-p792.onrender.com/api/orders/merchant/${merchantId}/total-revenue`,
+        { headers: getHeaders() }
+      );
+      if (revRes.ok) {
+        const revJson = await revRes.json();
+        console.log("[DEBUG] Revenue API Response:", revJson);
+        // Use null-coalescing to ensure null data becomes 0
+        setTotalRevenue(revJson.data ?? 0); 
+      }
+
+      // Fetch Total Orders
+      const ordRes = await fetch(
+        `https://order-service-p792.onrender.com/api/orders/merchant/${merchantId}/total-orders`,
+        { headers: getHeaders() }
+      );
+      if (ordRes.ok) {
+        const ordJson = await ordRes.json();
+        console.log("[DEBUG] Orders API Response:", ordJson);
+        setTotalOrders(ordJson.data ?? 0);
+      }
+    } catch (e) {
+      console.error("Failed to fetch merchant stats", e);
+    }
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -54,134 +100,84 @@ export default function MerchantHome() {
       const data = await ProductService.getMerchantListings();
       setProducts(data);
     } catch (e) {
-      console.error("Fetch failed", e);
+      console.error("Product fetch failed", e);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchProducts();
+    fetchMerchantStats();
+  }, []);
+
   return (
-    <div>
+    <div className="max-w-7xl mx-auto px-6">
       <MerchantHero>
         <span className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.4em]">
           Seller Central
         </span>
-        <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase">
-          Welcome back, {userName || "Partner"}
+        <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase leading-none">
+          Welcome, {userName || "Partner"}
         </h1>
 
         <StatsGrid>
           <StatCard>
-            <span>Live Products</span>
-            <h2>{products.length}</h2>
+            <span>Live Inventory</span>
+            <h2>{products.length} Items</h2>
+            <Package className="absolute right-6 bottom-6 text-zinc-100/50" size={48} />
           </StatCard>
+
           <StatCard>
             <span>Total Revenue</span>
-            <h2>$0.00</h2>
+            {/* Displaying raw number if toLocaleString fails for any reason */}
+            <h2>
+               ${(totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </h2>
+            <DollarSign className="absolute right-6 bottom-6 text-zinc-100/50" size={48} />
           </StatCard>
+
           <StatCard>
-            <span>Active Orders</span>
-            <h2>0</h2>
+            <span>Total Orders</span>
+            <h2>{totalOrders || 0}</h2>
+            <ShoppingBag className="absolute right-6 bottom-6 text-zinc-100/50" size={48} />
           </StatCard>
         </StatsGrid>
       </MerchantHero>
 
-      <section>
+      <section className="pb-20">
         <div className="flex justify-between items-end mb-12">
           <div>
-            <h3 className="text-2xl font-black tracking-tight uppercase">
-              Your Inventory
-            </h3>
-            <p className="text-zinc-400 text-xs font-bold mt-1 uppercase tracking-widest">
-              Manage your listed products
-            </p>
+            <h3 className="text-2xl font-black tracking-tight uppercase">Current Listings</h3>
+            <p className="text-zinc-400 text-sm font-medium">Manage your active products</p>
           </div>
-          <button
-            onClick={() => navigate("/merchant/manage")}
-            className="bg-black text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-transform"
+          <button 
+            onClick={() => navigate("/merchant/manage")} 
+            className="bg-black text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-colors"
           >
-            <Plus size={14} /> Add New Product
+            <Plus size={16} /> Add New Product
           </button>
         </div>
 
-        {/* API PLACEHOLDER AREA */}
         {loading ? (
-          <div className="py-32 border-2 border-dashed border-zinc-100 rounded-[3rem] flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mb-6">
-              <LayoutGrid className="text-zinc-200" size={32} />
-            </div>
-            <h4 className="font-black text-zinc-300 uppercase tracking-widest text-sm">
-              Loading...
-            </h4>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="py-32 border-2 border-dashed border-zinc-100 rounded-[3rem] flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mb-6">
-              <LayoutGrid className="text-zinc-200" size={32} />
-            </div>
-            <h4 className="font-black text-zinc-300 uppercase tracking-widest text-sm">
-              No Products Yet
-            </h4>
-            <p className="text-zinc-400 text-xs mt-2 max-w-xs">
-              Start by adding your first product to your inventory.
-            </p>
+          <div className="py-32 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="animate-spin text-zinc-300" size={40} />
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loading Inventory...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products.map((product) => (
-              <div
-                key={`${product.productId}-${JSON.stringify(product.attributes)}`}
-                className="bg-white p-6 rounded-[2rem] border border-zinc-100 hover:shadow-lg transition-shadow flex flex-col h-full"
-              >
-                {/* Image Section */}
-                <div className="aspect-[4/3] bg-zinc-50 rounded-xl overflow-hidden mb-4 border border-zinc-100 p-4 flex items-center justify-center">
-                  <img
-                    src={product.imageUrl || "/placeholder-image.png"}
-                    alt={product.name}
-                    className="w-full h-full object-contain mix-blend-multiply"
-                    onError={(e) => {
-                      e.currentTarget.src = "/placeholder-image.png";
-                    }}
-                  />
+              <div key={`${product.productId}-${product.variantId}`} className="bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm hover:border-black transition-all">
+                <div className="aspect-[4/3] bg-zinc-50 rounded-2xl mb-6 p-6 flex items-center justify-center">
+                  <img src={product.imageUrl || "/placeholder-image.png"} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
                 </div>
-
-                <div className="flex-1">
-                  <h3 className="font-black text-lg mb-1">{product.name}</h3>
-                  <p className="text-zinc-500 text-sm mb-3 font-bold uppercase tracking-wider">
-                    {product.brand}
-                  </p>
-
-                  {/* 🆕 Attributes (Color, Specs) Display */}
-                  {product.attributes && Object.keys(product.attributes).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {Object.entries(product.attributes).map(([key, value]) => (
-                        <div 
-                          key={key} 
-                          className="bg-zinc-100 text-zinc-600 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border border-zinc-200"
-                        >
-                          <span className="text-zinc-400 mr-1">{key}:</span>
-                          {String(value)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-zinc-100 mt-auto">
-                  <div className="flex justify-between items-center">
-                    <div>
-                        <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest">Your Price</p>
-                        <p className="text-zinc-900 font-black text-xl">
-                        ${product.lowestPrice.toFixed(2)}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest">Status</p>
-                        <span className={`inline-flex items-center gap-1 font-bold text-xs ${product.inStock ? 'text-green-600' : 'text-red-500'}`}>
-                            {product.inStock ? "In Stock" : "Out of Stock"}
-                        </span>
-                    </div>
-                  </div>
+                <h3 className="font-black text-xl leading-tight">{product.name}</h3>
+                <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-4">{product.brand}</p>
+                <div className="pt-6 border-t border-zinc-50 flex justify-between items-center mt-auto">
+                  <span className="text-2xl font-black">${product.lowestPrice.toFixed(2)}</span>
+                  <span className={`text-[10px] font-black ${product.inStock ? 'text-green-600' : 'text-red-500'}`}>
+                    {product.inStock ? "● ACTIVE" : "○ OUT OF STOCK"}
+                  </span>
                 </div>
               </div>
             ))}

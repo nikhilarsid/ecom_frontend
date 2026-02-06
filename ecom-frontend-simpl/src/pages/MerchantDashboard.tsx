@@ -13,10 +13,12 @@ import {
 } from "lucide-react";
 
 interface InventoryItem extends ProductListItem {
-  // For edit mode
   editing?: boolean;
   newPrice?: number;
   newStock?: number;
+  // Ensure these match what the service provides
+  specs?: Record<string, string>;
+  attributes?: Record<string, string>;
 }
 
 export default function MerchantDashboard() {

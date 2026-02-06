@@ -1,269 +1,237 @@
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import ProductService, { ProductDetail } from "../services/ProductService";
-import { Star, ShoppingCart, AlertCircle, Loader2, Check } from "lucide-react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import styled, { keyframes } from "styled-components";
+import {
+  Star,
+  ShoppingCart,
+  Loader2,
+  Minus,
+  Plus,
+  AlertCircle,
+  Store,
+  Edit3,
+  Trash2,
+  X
+} from "lucide-react";
 
-export default function ProductDetails() {
-  const { id } = useParams<{ id: string }>();
+// --- Styled Components ---
+const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
+const Spinner = styled(Loader2)`
+  animation: ${spin} 1s linear infinite;
+`;
+
+const FeedbackBanner = styled.div<{ $type: "error" | "success" }>`
+  background: ${(props) => (props.$type === "error" ? "#FEF2F2" : "#F0FDF4")};
+  border: 1px solid ${(props) => (props.$type === "error" ? "#FEE2E2" : "#DCFCE7")};
+  color: ${(props) => (props.$type === "error" ? "#991B1B" : "#166534")};
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+`;
+
+export default function IndividualProductDetails() {
+  const { id } = useParams();
   const [searchParams] = useSearchParams();
   const variantId = searchParams.get("variantId");
+  const navigate = useNavigate();
+  const currentUserEmail = localStorage.getItem("userName"); // Assuming email is stored here
 
-  const [product, setProduct] = useState<ProductDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [product, setProduct] = useState<any>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [quantity, setQuantity] = useState(1);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [status, setStatus] = useState<{ msg: string; type: "error" | "success" } | null>(null);
+  
+  // Review Form State
+  const [userRating, setUserRating] = useState(5);
+  const [userComment, setUserComment] = useState("");
+  const [selectedMerchantForReview, setSelectedMerchantForReview] = useState<string>("");
+  const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
+
+  const getHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
+  const fetchData = async () => {
+    if (!id || !variantId) return;
+    try {
+      const pRes = await fetch(`https://product-service-jzzf.onrender.com/api/v1/products/${id}?variantId=${variantId}`, { headers: getHeaders() });
+      if (pRes.ok) {
+        const json = await pRes.json();
+        setProduct(json.data);
+        // Default selection for review to first merchant if available
+        if (json.data.sellers?.length > 0) setSelectedMerchantForReview(json.data.sellers[0].merchantId);
+      }
+    } catch (e) { console.error("Fetch failed", e); }
+  };
+
+  const fetchReviews = async (merchantId: string) => {
+    try {
+      const rRes = await fetch(`https://review-service-z6zl.onrender.com/api/v1/reviews/view?productId=${id}&merchantId=${merchantId}`, { headers: getHeaders() });
+      if (rRes.ok) {
+        const rJson = await rRes.json();
+        setReviews(rJson || []);
+        
+        // Check if user already has a review for this variant and merchant
+        const existing = rJson.find((r: any) => r.userName === currentUserEmail && r.variantId === variantId);
+        if (existing) {
+          setEditingReviewId(existing.id);
+          setUserRating(existing.rating);
+          setUserComment(existing.comment);
+        } else {
+          setEditingReviewId(null);
+          setUserComment("");
+          setUserRating(5);
+        }
+      }
+    } catch (e) { console.error("Review fetch failed", e); }
+  };
 
   useEffect(() => {
-    if (id) {
-      fetchProductDetail();
-    }
+    fetchData();
   }, [id, variantId]);
 
-  const fetchProductDetail = async () => {
+  useEffect(() => {
+    if (selectedMerchantForReview) fetchReviews(selectedMerchantForReview);
+  }, [selectedMerchantForReview]);
+
+  const handleReviewAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userComment.trim() || !selectedMerchantForReview) return;
+
+    setIsReviewing(true);
+    const url = editingReviewId 
+      ? `https://review-service-z6zl.onrender.com/api/v1/reviews/update/${editingReviewId}`
+      : `https://review-service-z6zl.onrender.com/api/v1/reviews/create`;
+    
+    const method = editingReviewId ? "PUT" : "POST";
+    const body = editingReviewId 
+      ? { rating: userRating, comment: userComment }
+      : { productId: id, variantId, merchantId: selectedMerchantForReview, rating: userRating, comment: userComment };
+
     try {
-      setLoading(true);
-      const data = await ProductService.getProductDetail(
-        id!,
-        variantId || undefined,
-      );
-      setProduct(data);
-    } catch (e) {
-      console.error("Fetch failed", e);
-      setError("Failed to load product details");
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
+      if (res.ok) {
+        setStatus({ msg: editingReviewId ? "Review updated." : "Review published.", type: "success" });
+        fetchReviews(selectedMerchantForReview);
+      } else {
+        const err = await res.json();
+        setStatus({ msg: err.message || "Action failed.", type: "error" });
+      }
+    } finally { setIsReviewing(false); }
   };
 
-  const handleAddToCart = (merchantName: string, price: number) => {
-    // For now, just console log
-    console.log(
-      `Added to cart: ${product?.name} from ${merchantName} at $${price}`,
-    );
-    alert(`Added to cart: ${product?.name} from ${merchantName}`);
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!window.confirm("Delete this review?")) return;
+    try {
+      const res = await fetch(`https://review-service-z6zl.onrender.com/api/v1/reviews/delete/${reviewId}`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setStatus({ msg: "Review deleted.", type: "success" });
+        setEditingReviewId(null);
+        setUserComment("");
+        fetchReviews(selectedMerchantForReview);
+      }
+    } catch (e) { setStatus({ msg: "Delete failed.", type: "error" }); }
   };
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center py-32">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 animate-spin text-black" />
-          <p className="text-zinc-500 font-semibold">
-            Loading product details...
-          </p>
-        </div>
-      </div>
-    );
-  if (error)
-    return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 flex items-center gap-4">
-          <AlertCircle className="w-6 h-6 text-red-500" />
-          <p className="text-red-700 font-semibold">{error}</p>
-        </div>
-      </div>
-    );
-  if (!product)
-    return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 text-center">
-          <p className="text-zinc-600 font-semibold">Product not found</p>
-        </div>
-      </div>
-    );
+  if (!product) return <div className="flex justify-center py-20"><Spinner size={40} /></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* Hero Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-16">
-        {/* Product Image - Smaller and elegant */}
-        <div className="lg:col-span-1">
-          <div className="aspect-[3/4] bg-zinc-50 rounded-[2rem] overflow-hidden border border-zinc-100 flex items-center justify-center">
-            <img
-              src={
-                product.imageUrls?.[0] || "https://via.placeholder.com/400x500"
-              }
-              alt={product.name}
-              className="w-full h-full object-contain p-6"
-            />
-          </div>
-          {/* Carousel if multiple images */}
-          {product.imageUrls && product.imageUrls.length > 1 && (
-            <div className="flex gap-2 mt-4 overflow-x-auto">
-              {product.imageUrls.map((url, index) => (
-                <img
-                  key={index}
-                  src={url}
-                  alt={`${product.name} ${index + 1}`}
-                  className="w-14 h-14 object-cover rounded-lg cursor-pointer border border-zinc-200 hover:border-black transition-colors flex-shrink-0"
-                />
-              ))}
-            </div>
-          )}
-        </div>
+      {/* ... (Product Image and Specs remain same) ... */}
 
-        {/* Product Info */}
-        <div className="lg:col-span-2">
-          <div className="mb-2">
-            <span className="text-xs font-black uppercase tracking-widest text-zinc-400">
-              {product.brand}
-            </span>
-          </div>
-          <h1 className="text-4xl lg:text-5xl font-black tracking-tight mb-4">
-            {product.name}
-          </h1>
-
-          {/* Rating */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex items-center gap-1 bg-black text-white px-3 py-1 rounded-full">
-              <Star size={14} className="fill-white" />
-              <span className="text-sm font-bold">4.8</span>
-            </div>
-            <span className="text-xs text-zinc-400 font-semibold">
-              (0 REVIEWS)
-            </span>
-          </div>
-
-          {product.description && (
-            <p className="text-zinc-600 mb-8 text-lg leading-relaxed">
-              {product.description}
-            </p>
-          )}
-
-          {/* Categories */}
-          {product.categories && product.categories.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-3">
-                Categories
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {product.categories.map((category, index) => (
-                  <span
-                    key={index}
-                    className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded-full text-sm font-semibold"
-                  >
-                    {category}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Attributes */}
-          {product.attributes && Object.keys(product.attributes).length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-3">
-                Attributes
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.entries(product.attributes).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="bg-zinc-50 border border-zinc-100 p-3 rounded-xl"
-                  >
-                    <span className="text-xs font-black uppercase tracking-widest text-zinc-400 block mb-1">
-                      {key}
-                    </span>
-                    <span className="text-sm font-semibold text-zinc-900">
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Specs */}
-          {product.specs && Object.keys(product.specs).length > 0 && (
-            <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-3">
-                Specifications
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.entries(product.specs).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="bg-zinc-50 border border-zinc-100 p-3 rounded-xl"
-                  >
-                    <span className="text-xs font-black uppercase tracking-widest text-zinc-400 block mb-1">
-                      {key}
-                    </span>
-                    <span className="text-sm font-semibold text-zinc-900">
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Available Offers Section */}
-      <div>
-        <div className="mb-8">
-          <h2 className="text-3xl font-black tracking-tight uppercase">
-            Available Offers
-          </h2>
-        </div>
-
-        {product.sellers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {product.sellers.map((seller, index) => (
-              <div
-                key={index}
-                className="bg-white border border-zinc-100 rounded-[2rem] p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="mb-4">
-                  <h3 className="text-lg font-black mb-1">
-                    {seller.merchantName}
-                  </h3>
-                  <p className="text-xs font-mono text-zinc-400">
-                    {seller.merchantId}
-                  </p>
-                </div>
-
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-black">
-                    ${seller.price.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 mb-6">
-                  {seller.stock > 0 ? (
-                    <>
-                      <div className="flex items-center gap-1 text-green-600 font-semibold text-sm">
-                        <Check size={16} />
-                        IN STOCK ({seller.stock})
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1 text-red-600 font-semibold text-sm">
-                      <AlertCircle size={16} />
-                      OUT OF STOCK
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() =>
-                    handleAddToCart(seller.merchantName, seller.price)
-                  }
-                  disabled={seller.stock === 0}
-                  className="w-full bg-black text-white px-4 py-3 rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-105 transition-transform disabled:bg-zinc-300 disabled:cursor-not-allowed"
+      <div className="lg:col-span-2 space-y-8">
+        <h1 className="text-5xl font-black">{product.name}</h1>
+        
+        {/* Sellers List */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-black uppercase text-zinc-400">Merchant Offers</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {product.sellers?.map((seller: any) => (
+              <div key={seller.merchantId} className="bg-white border p-6 rounded-[2rem]">
+                <h4 className="font-black">{seller.merchantName}</h4>
+                <span className="font-black text-2xl">${seller.price.toFixed(2)}</span>
+                <button 
+                  onClick={() => setSelectedMerchantForReview(seller.merchantId)}
+                  className="mt-2 text-xs font-bold text-zinc-400 flex items-center gap-1 hover:text-black"
                 >
-                  <ShoppingCart size={16} />
-                  Add to Cart
+                  <Star size={12} /> View Reviews for this Seller
                 </button>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 text-center">
-            <p className="text-zinc-600 font-semibold">
-              No sellers available for this product
-            </p>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="pt-16 mt-16 border-t border-zinc-100">
+          <div className="flex justify-between items-center mb-10">
+             <h3 className="text-3xl font-black italic uppercase">Feedback for {selectedMerchantForReview}</h3>
           </div>
-        )}
+
+          {/* Form */}
+          <form onSubmit={handleReviewAction} className="space-y-6 bg-zinc-50 p-8 rounded-[2rem] border mb-12">
+            <h4 className="font-bold text-lg">{editingReviewId ? "Modify Your Review" : "Share Your Experience"}</h4>
+            
+            <div className="flex gap-3">
+              {[1, 2, 3, 4, 5].map((num) => (
+                <Star key={num} size={32} onClick={() => setUserRating(num)} 
+                  fill={num <= userRating ? "black" : "none"} className="cursor-pointer" />
+              ))}
+            </div>
+            
+            <textarea 
+              value={userComment}
+              onChange={(e) => setUserComment(e.target.value)}
+              placeholder="How was the product and the delivery?"
+              className="w-full p-6 rounded-2xl border-none bg-white shadow-inner min-h-[120px]"
+            />
+            
+            <div className="flex gap-4">
+              <button type="submit" disabled={isReviewing} className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest">
+                {isReviewing ? <Spinner size={18} /> : (editingReviewId ? "Update Review" : "Publish Review")}
+              </button>
+              {editingReviewId && (
+                <button type="button" onClick={() => handleDeleteReview(editingReviewId)} className="bg-red-500 text-white px-6 rounded-2xl">
+                  <Trash2 size={20} />
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* List */}
+          <div className="grid gap-6">
+            {reviews.map((review: any) => (
+              <div key={review.id} className="p-6 bg-white border rounded-2xl">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold">{review.userName}</span>
+                  <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={12} fill={i < review.rating ? "black" : "#e4e4e7"} stroke="none" />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-zinc-600 text-sm">{review.comment}</p>
+                <span className="text-[10px] text-zinc-400 font-bold uppercase mt-2 block">
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

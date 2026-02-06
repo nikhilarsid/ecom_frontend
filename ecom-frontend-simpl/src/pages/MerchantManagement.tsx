@@ -1,234 +1,172 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { 
   Plus, 
-  Search, 
   Trash2, 
-  Edit3, 
-  Image as ImageIcon, 
-  X, 
   Database,
   Loader2,
-  AlertCircle,
-  Construction
+  PackageCheck,
+  TrendingUp,
 } from 'lucide-react';
+import ProductService, { ProductListItem } from '../services/ProductService';
 
-// --- STYLED COMPONENTS ---
-const FeedbackBanner = styled.div`
-  background: #000;
-  color: #fff;
-  padding: 16px 24px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-`;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  width: 100%;
-  max-width: 650px;
-  border-radius: 48px;
-  padding: 56px;
-  position: relative;
-  box-shadow: 0 40px 80px rgba(0,0,0,0.15);
-`;
-
-const FormGrid = styled.form`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+// --- SUB-COMPONENT: REAL-TIME ANALYTICS ---
+function VariantAnalytics({ productId, variantId }: { productId: number; variantId: string }) {
+  const [stats, setStats] = useState<{ numberOfOrdersSold: number; amountGenerated: number } | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  .full { grid-column: span 2; }
-  
-  label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #a1a1aa; margin-bottom: 8px; display: block; }
-  
-  input, textarea {
-    width: 100%;
-    padding: 18px;
-    background: #f8f8fa;
-    border: 1px solid #f1f1f1;
-    border-radius: 20px;
-    font-weight: 600;
-    outline: none;
-    transition: all 0.2s;
-    &:focus { border-color: #000; background: #fff; }
-  }
-`;
+  // Use the email address saved during login
+  const merchantEmail = localStorage.getItem("userName"); 
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!merchantEmail || merchantEmail === "undefined") return;
+      
+      try {
+        const token = localStorage.getItem("token");
+        const url = `https://order-service-p792.onrender.com/api/orders/merchant/${merchantEmail}/stats?productId=${productId}&variantId=${variantId}`;
+        
+        const res = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          // Log to verify if the data is actually coming through
+          console.log(`[STATS DEBUG] ID: ${productId} ->`, json.data);
+          if (json.success) setStats(json.data);
+        }
+      } catch (e) {
+        console.error("Stats fetch failed", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, [productId, variantId, merchantEmail]);
+
+  if (loading) return <div className="h-6 w-24 bg-zinc-50 animate-pulse rounded mx-auto" />;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex items-center gap-2 text-black font-black">
+        <PackageCheck size={14} className="text-zinc-400" />
+        {/* Fallback to 0 if data is null */}
+        {stats?.numberOfOrdersSold ?? 0}
+      </div>
+      <div className="flex items-center gap-2 text-green-600 font-black text-sm">
+        <TrendingUp size={12} />
+        ${(stats?.amountGenerated ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+      </div>
+    </div>
+  );
+}
 
 export default function MerchantManagement() {
-  const [products, setProducts] = useState<any[]>([]); // Set to empty to show "Under Progress" state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<any>(null);
+  const [products, setProducts] = useState<ProductListItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // --- API HANDLERS ---
-
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchProducts = async () => {
     setLoading(true);
-    // API ENDPOINT: POST https://product-service-jzzf.onrender.com/api/v1/products
-    console.log("Calling Add Product API...");
-    setTimeout(() => {
-      alert("ADD API: INTEGRATION UNDER PROGRESS");
+    try {
+      const data = await ProductService.getMerchantListings();
+      setProducts(data);
+    } catch (e) {
+      console.error("Fetch failed", e);
+    } finally {
       setLoading(false);
-      setIsModalOpen(false);
-    }, 1000);
+    }
   };
 
-  const handleEditProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    // API ENDPOINT: PUT https://product-service-jzzf.onrender.com/api/v1/products/{id}
-    console.log(`Calling Edit API for ID: ${currentProduct.id}`);
-    setTimeout(() => {
-      alert("EDIT API: INTEGRATION UNDER PROGRESS");
-      setLoading(false);
-      setIsModalOpen(false);
-    }, 1000);
-  };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (!window.confirm("Are you sure you want to remove this listing?")) return;
-    // API ENDPOINT: DELETE https://product-service-jzzf.onrender.com/api/v1/products/{id}
-    console.log(`Calling Delete API for ID: ${productId}`);
-    alert("DELETE API: INTEGRATION UNDER PROGRESS");
-  };
-
-  const openEditModal = (product: any) => {
-    setIsEditing(true);
-    setCurrentProduct(product);
-    setIsModalOpen(true);
+  const handleDeleteProduct = async (productId: number, variantId?: string) => {
+    if (!window.confirm("Remove this listing from Ethereal?")) return;
+    try {
+      await ProductService.deleteInventory(productId.toString(), variantId || "");
+      fetchProducts();
+    } catch (e) {
+      alert("Failed to remove product.");
+    }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6">
-      <header className="mb-12">
-        <span className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.4em]">Operations</span>
-        <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase">Inventory Management</h1>
-      </header>
-
-      <FeedbackBanner>
-        <Construction size={18} />
-        Merchant Inventory APIs are currently under progress by the backend team
-      </FeedbackBanner>
-
-      <div className="flex justify-between items-center mb-10">
-        <div className="relative w-96">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-300" size={18} />
-          <input className="w-full pl-14 pr-6 py-4 rounded-2xl bg-zinc-50 border-none outline-none font-bold text-sm" placeholder="Search SKU..." />
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      <header className="flex justify-between items-end mb-16">
+        <div>
+          <span className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.4em]">Operations</span>
+          <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase leading-none">Inventory Performance</h1>
         </div>
         
         <button 
-          onClick={() => { setIsEditing(false); setIsModalOpen(true); }}
-          className="bg-black text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all"
+          onClick={() => navigate("/merchant/dashboard")}
+          className="bg-black text-white px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2"
         >
-          <Plus size={16} /> Add Listing
+          <Plus size={16} /> Add New Listing
         </button>
-      </div>
+      </header>
 
-      {/* INVENTORY TABLE */}
-      <div className="bg-white border border-zinc-100 rounded-[3rem] overflow-hidden">
-        <div className="grid grid-cols-5 p-10 border-b border-zinc-50 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-          <span className="col-span-2">Item Description</span>
-          <span className="text-center">Stock</span>
-          <span className="text-center">Price</span>
-          <span className="text-right">Actions</span>
+      <div className="bg-white border border-zinc-100 rounded-[3.5rem] overflow-hidden shadow-sm">
+        {/* TABLE HEADER */}
+        <div className="grid grid-cols-6 p-12 border-b border-zinc-50 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
+          <span className="col-span-2 text-left">Item Description</span>
+          <span className="text-center">Listing ID</span>
+          <span className="text-center border-l border-zinc-50">Current Price</span>
+          <span className="text-center col-span-2 border-l border-zinc-50">Performance (Sold / Earned)</span>
         </div>
 
-        {products.length === 0 ? (
+        {loading ? (
+          <div className="py-40 flex justify-center"><Loader2 className="animate-spin text-zinc-200" size={48} /></div>
+        ) : products.length === 0 ? (
           <div className="py-48 flex flex-col items-center justify-center text-center">
             <Database size={64} className="text-zinc-100 mb-6" />
-            <h3 className="text-xl font-black uppercase tracking-tight text-zinc-300">No Data Available</h3>
-            <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest mt-2 italic">Awaiting API Synchronization</p>
+            <h3 className="text-xl font-black uppercase tracking-tight text-zinc-300">Inventory Empty</h3>
           </div>
         ) : (
           <div className="divide-y divide-zinc-50">
             {products.map(p => (
-              <div key={p.id} className="grid grid-cols-5 p-10 items-center hover:bg-zinc-50 transition-colors group">
-                <div className="col-span-2 flex items-center gap-6">
-                  <div className="w-20 h-20 bg-white rounded-3xl border border-zinc-100 flex items-center justify-center">
-                    <ImageIcon className="text-zinc-200" size={28} />
+              <div key={`${p.productId}-${p.variantId}`} className="grid grid-cols-6 p-12 items-center hover:bg-zinc-50 transition-colors group">
+                <div className="col-span-2 flex items-center gap-8">
+                  <div className="w-24 h-24 bg-white rounded-[2rem] border border-zinc-100 flex items-center justify-center overflow-hidden">
+                    <img src={p.imageUrl} alt="" className="w-full h-full object-contain mix-blend-multiply p-3" />
                   </div>
                   <div>
-                    <h4 className="text-xl font-black tracking-tight">{p.name}</h4>
-                    <span className="text-[10px] font-black text-zinc-300 uppercase tracking-widest">SKU: {p.sku}</span>
+                    <h4 className="text-2xl font-black tracking-tight leading-none mb-2">{p.name}</h4>
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{p.brand}</span>
                   </div>
                 </div>
-                <div className="text-center font-black text-zinc-500">{p.stock} units</div>
-                <div className="text-center font-black text-xl">${p.price}</div>
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => openEditModal(p)} className="p-4 rounded-2xl bg-zinc-50 text-zinc-400 hover:bg-black hover:text-white transition-all"><Edit3 size={18}/></button>
-                  <button onClick={() => handleDeleteProduct(p.id)} className="p-4 rounded-2xl bg-zinc-50 text-zinc-400 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
+
+                <div className="text-center text-[11px] font-bold text-zinc-300 font-mono">
+                   #{p.productId}
+                </div>
+
+                <div className="text-center font-black text-2xl text-black">
+                  ${p.lowestPrice.toFixed(2)}
+                </div>
+
+                {/* ANALYTICS COLUMNS */}
+                <div className="col-span-2 flex items-center justify-between pl-12">
+                  <VariantAnalytics productId={p.productId} variantId={p.variantId} />
+                  
+                  <button 
+                    onClick={() => handleDeleteProduct(p.productId, p.variantId)}
+                    className="p-5 rounded-2xl bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* DYNAMIC MODAL (ADD / EDIT) */}
-      {isModalOpen && (
-        <ModalOverlay onClick={() => setIsModalOpen(false)}>
-          <ModalContent onClick={e => e.stopPropagation()}>
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-10 right-10 text-zinc-300 hover:text-black transition-colors">
-              <X size={28} />
-            </button>
-
-            <header className="mb-12">
-              <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-none">
-                {isEditing ? 'Update Listing' : 'New Listing'}
-              </h2>
-              <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mt-4">Product Service Interface</p>
-            </header>
-
-            <FormGrid onSubmit={isEditing ? handleEditProduct : handleAddProduct}>
-              <div className="full">
-                <label>Product Name</label>
-                <input required defaultValue={isEditing ? currentProduct.name : ''} placeholder="e.g. Marble Pedestal Table" />
-              </div>
-              <div>
-                <label>SKU / Merchant ID</label>
-                <input required defaultValue={isEditing ? currentProduct.sku : ''} placeholder="e.g. ETH-992" />
-              </div>
-              <div>
-                <label>Price ($)</label>
-                <input type="number" required defaultValue={isEditing ? currentProduct.price : ''} placeholder="0.00" />
-              </div>
-              <div className="full">
-                <label>Description</label>
-                <textarea rows={4} required defaultValue={isEditing ? currentProduct.description : ''} placeholder="Technical specifications and aesthetic details..." />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={loading}
-                className="full bg-black text-white py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 mt-4 hover:opacity-90 active:scale-95 transition-all"
-              >
-                {loading ? <Loader2 className="animate-spin" size={20} /> : (isEditing ? 'Update Records' : 'Deploy to Shop')}
-              </button>
-            </FormGrid>
-          </ModalContent>
-        </ModalOverlay>
-      )}
     </div>
   );
 }

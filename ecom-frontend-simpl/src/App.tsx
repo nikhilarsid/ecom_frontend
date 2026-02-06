@@ -6,7 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import Layout from "./components/Layout";
-import { ToastContainer } from "react-toastify";
+// Note: We keep the CSS import so styles work if the library is fixed
 import "react-toastify/dist/ReactToastify.css";
 
 // Page Imports
@@ -24,7 +24,6 @@ import MerchantDashboard from "./pages/MerchantDashboard";
 import MerchantManagement from "./pages/MerchantManagement";
 
 // --- PROTECTED ROUTE COMPONENT ---
-// Ensures only authorized users can access specific business or customer logic
 const ProtectedRoute = ({
   children,
   allowedRole,
@@ -37,7 +36,6 @@ const ProtectedRoute = ({
 
   if (!token) return <Navigate to="/login" replace />;
 
-  // If a role is specified and the user doesn't match, send them to their respective home
   if (allowedRole && role !== allowedRole) {
     return role === "MERCHANT" ? (
       <Navigate to="/merchant" replace />
@@ -53,27 +51,15 @@ function App() {
   return (
     <Router>
       <Layout>
-        <ToastContainer
-          position="bottom-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
+        {/* REMOVED ToastContainer from here. 
+          React 19 currently has a conflict with the Lt component in react-toastify.
+        */}
         <Routes>
-          {/* --- PUBLIC ACCESSIBLE ROUTES --- */}
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<IndividualProductDetails />} />
-
-          {/* AUTHENTICATION */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* --- CUSTOMER EXCLUSIVE ROUTES --- */}
           <Route
             path="/cart"
             element={
@@ -101,9 +87,7 @@ function App() {
             }
           />
 
-          {/* --- MERCHANT SECTOR (Seller Central Logic) --- */}
           <Route path="/merchant">
-            {/* Merchant landing page - showing their own inventory only */}
             <Route
               index
               element={
@@ -113,7 +97,6 @@ function App() {
               }
             />
 
-            {/* Sales analytics and business stats */}
             <Route
               path="dashboard"
               element={
@@ -123,7 +106,6 @@ function App() {
               }
             />
 
-            {/* Inventory Management: Add, Update, and Delete Products */}
             <Route
               path="manage"
               element={
@@ -134,8 +116,6 @@ function App() {
             />
           </Route>
 
-          {/* CATCH-ALL REDIRECT */}
-          {/* Handles broken links by returning users to their appropriate base page */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
