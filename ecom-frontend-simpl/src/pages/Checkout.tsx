@@ -11,6 +11,7 @@ import {
   Banknote,
   DollarSign,
 } from "lucide-react";
+import { showToast } from "../utils/toast";
 
 const CheckoutContainer = styled.div`
   max-width: 1200px;
@@ -158,14 +159,14 @@ export default function Checkout() {
       const json = await res.json();
 
       if (json.success) {
-        alert(`Order Placed Successfully! Order ID: ${json.data}`);
+        showToast.success(`Order Placed Successfully! Order ID: ${json.data}`);
         window.dispatchEvent(new Event("cartUpdated"));
         navigate("/orders");
       } else {
-        alert("Failed to place order: " + json.message);
+        showToast.error("Failed to place order: " + json.message);
       }
     } catch (e) {
-      alert("Network Error during checkout.");
+      showToast.error("Network Error during checkout.");
     } finally {
       setIsProcessing(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, HardDrive, Palette, Loader2, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProductService, { ProductListItem } from "../services/ProductService";
@@ -34,6 +34,10 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAllProducts();
@@ -42,6 +46,44 @@ export default function Home() {
   useEffect(() => {
     applyFilters();
   }, [searchTerm, selectedCategory, allProducts]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+
+    // Clear previous timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // If search is empty, clear suggestions
+    if (!value.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // Set new timer for debounced search
+    debounceTimer.current = setTimeout(() => {
+      fetchSuggestions(value);
+    }, 300); // 300ms debounce
+  };
+
+  const fetchSuggestions = async (query: string) => {
+    try {
+      const results = await ProductService.searchProducts(query);
+      setSuggestions(results.slice(0, 8)); // Show top 8 suggestions
+      setShowSuggestions(true);
+    } catch (e) {
+      console.error("Suggestions fetch failed", e);
+      setSuggestions([]);
+    }
+  };
+
+  const handleSuggestionClick = (product: Product) => {
+    setSearchTerm(product.name);
+    setShowSuggestions(false);
+    setProducts([product]);
+  };
 
   const fetchAllProducts = async () => {
     setLoading(true);
@@ -58,13 +100,23 @@ export default function Home() {
   const applyFilters = async () => {
     let filtered = [...allProducts];
 
-    // Filter by search term
+    // If there's a search term, use the API search instead
     if (searchTerm.trim()) {
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+      try {
+        setLoading(true);
+        const searchResults = await ProductService.searchProducts(searchTerm);
+        filtered = searchResults;
+      } catch (e) {
+        console.error("Search failed", e);
+        // Fallback to local filtering
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+        );
+      } finally {
+        setLoading(false);
+      }
     }
 
     // Filter by selected category
@@ -92,11 +144,37 @@ export default function Home() {
             className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"
           />
           <input
+            ref={searchInputRef}
             className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-lg border border-gray-200 focus:bg-white focus:border-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
             placeholder="Search by brand or model..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onFocus={() => searchTerm && suggestions.length > 0 && setShowSuggestions(true)}
           />
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={`${suggestion.productId}-${suggestion.variantId}`}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors text-left"
+                >
+                  <img
+                    src={suggestion.imageUrl || "https://via.placeholder.com/50"}
+                    alt={suggestion.name}
+                    className="w-12 h-12 rounded object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{suggestion.name}</p>
+                    <p className="text-xs text-gray-500">{suggestion.brand}</p>
+                    <p className="text-sm font-bold text-black">${suggestion.lowestPrice.toFixed(2)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {(searchTerm || selectedCategory) && (
           <button
