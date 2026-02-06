@@ -122,7 +122,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch('https://order-service-p792.onrender.com/api/cart', {
+      const res = await fetch('https://order-service-p792.onrender.com/api/cart/view', {
         headers: { 'Authorization': `Bearer ${activeToken}` }
       });
       const json = await res.json();

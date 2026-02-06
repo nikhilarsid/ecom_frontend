@@ -1,177 +1,224 @@
-import { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import { Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
-
-// --- STYLED COMPONENTS (Premium Aesthetic) ---
-const Container = styled.div`
-  max-width: 1440px;
-  margin: 0 auto;
-`;
-
-const SearchBarWrapper = styled.div`
-  display: flex;
-  gap: 16px;
-  margin-bottom: 48px;
-  align-items: center;
-
-  input {
-    flex: 1;
-    padding: 14px 24px;
-    border-radius: 12px;
-    border: 1px solid #E4E4E7;
-    background: #F4F4F5;
-    font-size: 15px;
-    outline: none;
-    transition: all 0.2s;
-    &:focus { background: white; border-color: #000; box-shadow: 0 0 0 2px rgba(0,0,0,0.05); }
-  }
-`;
-
-const ProductGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 40px;
-`;
-
-const ProductLink = styled(Link)`
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-4px);
-  }
-`;
-
-const Card = styled.div`
-  display: flex;
-  flex-direction: column;
-  position: relative;
-`;
-
-const ImageBox = styled.div`
-  aspect-ratio: 4/5;
-  background: #f1f1f1;
-  border-radius: 16px;
-  overflow: hidden;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    mix-blend-mode: multiply;
-    transition: transform 0.5s ease;
-  }
-
-  ${Card}:hover & img {
-    transform: scale(1.05);
-  }
-`;
-
-const OutOfStockOverlay = styled.div`
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: #EF4444;
-  color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  z-index: 10;
-`;
-
-const Info = styled.div`
-  h3 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
-  p { font-size: 13px; color: #71717A; margin: 4px 0 12px 0; }
-  .brand { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #A1A1AA; letter-spacing: 1px; }
-`;
+import { useState, useEffect } from "react";
+import { Search, HardDrive, Palette, Loader2, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import ProductService, { ProductListItem } from "../services/ProductService";
 
 // --- TYPES ---
-interface Product {
-  id: string;
-  name: string;
-  brand: string;
-  category: string;
-  imageUrls: string[];
-  description: string;
-}
+interface Product extends ProductListItem {}
+
+// --- CATEGORIES ---
+const FILTER_CATEGORIES = [
+  "Electricals",
+  "Sports",
+  "Electronics",
+  "Fashion",
+  "Home & Garden",
+  "Books",
+  "Toys",
+];
+
+const getAttributeIcon = (key: string) => {
+  switch (key.toLowerCase()) {
+    case "storage":
+      return <HardDrive size={14} />;
+    case "color":
+      return <Palette size={14} />;
+    default:
+      return null;
+  }
+};
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (searchTerm === "") {
-      fetchAllProducts();
-    } else {
-      handleSearch(searchTerm);
-    }
-  }, [searchTerm]);
+    fetchAllProducts();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [searchTerm, selectedCategory, allProducts]);
 
   const fetchAllProducts = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('https://product-service-jzzf.onrender.com/api/v1/products');
-      const json = await res.json();
-      if (json.success) setProducts(json.data);
+      const data = await ProductService.getAllProducts();
+      setAllProducts(data);
     } catch (e) {
       console.error("Fetch failed", e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSearch = async (keyword: string) => {
-    try {
-      const res = await fetch(`https://product-service-jzzf.onrender.com/api/v1/products/search?keyword=${keyword}`);
-      const json = await res.json();
-      if (json.success) setProducts(json.data);
-    } catch (e) {
-      console.error("Search failed", e);
+  const applyFilters = async () => {
+    let filtered = [...allProducts];
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
     }
+
+    // Filter by selected category
+    if (selectedCategory) {
+      filtered = filtered.filter((p) =>
+        p.categories?.includes(selectedCategory),
+      );
+    }
+
+    setProducts(filtered);
   };
 
-  const isOutOfStock = (productId: string) => {
-    const dummyOut = ["697af8966f07a30785c340fc"]; 
-    return dummyOut.includes(productId);
+  const clearFilters = () => {
+    setSelectedCategory("");
+    setSearchTerm("");
   };
 
   return (
-    <Container>
-      <SearchBarWrapper>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <Search size={18} style={{ position: 'absolute', left: 20, top: 16, color: '#A1A1AA' }} />
-          <input 
-            style={{ paddingLeft: '50px' }}
-            placeholder="Search by brand or model..." 
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Search Bar */}
+      <div className="flex gap-4 mb-8 items-center">
+        <div className="relative flex-1">
+          <Search
+            size={18}
+            className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400"
+          />
+          <input
+            className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-lg border border-gray-200 focus:bg-white focus:border-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+            placeholder="Search by brand or model..."
+            value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button style={{ background: 'black', color: 'white', padding: '12px 24px', borderRadius: '12px', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-          Filter
-        </button>
-      </SearchBarWrapper>
+        {(searchTerm || selectedCategory) && (
+          <button
+            onClick={clearFilters}
+            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+          >
+            <X size={18} />
+            Clear
+          </button>
+        )}
+      </div>
 
-      <ProductGrid>
-        {products.map((product) => (
-          <ProductLink key={product.id} to={`/product/${product.id}`}>
-            <Card>
-              {isOutOfStock(product.id) && <OutOfStockOverlay>Out of Stock</OutOfStockOverlay>}
-              <ImageBox>
-                <img src={product.imageUrls[0] || 'https://via.placeholder.com/400x500'} alt={product.name} />
-              </ImageBox>
-              <Info>
-                <span className="brand">{product.brand}</span>
-                <h3>{product.name}</h3>
-                <p>{product.description.substring(0, 60)}...</p>
-              </Info>
-            </Card>
-          </ProductLink>
-        ))}
-      </ProductGrid>
-    </Container>
+      {/* Category Filter Dropdown */}
+      <div className="mb-8">
+        <label className="text-sm font-black uppercase tracking-widest text-zinc-600 block mb-3">
+          Filter by Category
+        </label>
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="px-4 py-3 rounded-lg border border-gray-300 bg-white font-semibold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all min-w-[250px]"
+        >
+          <option value="">All Categories</option>
+          {FILTER_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Results Count */}
+      <div className="mb-6">
+        <p className="text-sm text-gray-600">
+          Showing <span className="font-bold">{products.length}</span> product
+          {products.length !== 1 ? "s" : ""}
+          {selectedCategory && (
+            <span className="ml-2">
+              in <span className="font-bold">{selectedCategory}</span>
+            </span>
+          )}
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-32">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-12 h-12 animate-spin text-black" />
+            <p className="text-zinc-500 font-semibold">Loading products...</p>
+          </div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="flex items-center justify-center py-32">
+          <div className="text-center">
+            <p className="text-gray-500 text-lg font-semibold">
+              No products found
+            </p>
+            <p className="text-gray-400 mt-2">
+              Try adjusting your filters or search term
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {products.map((product) => (
+            <Link
+              key={`${product.productId}-${product.variantId}`}
+              to={`/product/${product.productId}?variantId=${product.variantId}`}
+              className="block group"
+            >
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative">
+                {!product.inStock && (
+                  <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
+                    Out of Stock
+                  </div>
+                )}
+                <div className="aspect-[4/5] bg-gray-100 overflow-hidden">
+                  <img
+                    src={
+                      product.imageUrl || "https://via.placeholder.com/400x500"
+                    }
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-4">
+                  <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
+                    {product.brand}
+                  </span>
+                  <h3 className="text-lg font-bold mt-1 leading-tight">
+                    {product.name}
+                  </h3>
+
+                  {/* Attributes */}
+                  <div className="mt-2 mb-3 flex flex-wrap gap-2">
+                    {Object.entries(product.attributes).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md text-xs"
+                      >
+                        {getAttributeIcon(key)}
+                        <span className="font-medium">{key}:</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-xl font-bold">
+                      ${product.lowestPrice.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {product.totalMerchants} seller
+                      {product.totalMerchants !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
