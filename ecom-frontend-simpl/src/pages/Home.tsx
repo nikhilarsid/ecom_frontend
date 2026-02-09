@@ -35,13 +35,16 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [isFetchingBatch, setIsFetchingBatch] = useState(false); // Track batch loading specifically
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    fetchAllProducts();
+    fetchAllProducts(0);
   }, []);
 
   useEffect(() => {
@@ -83,72 +86,109 @@ export default function Home() {
     setProducts([product]);
   };
 
-  const fetchAllProducts = async () => {
-    setLoading(true);
-    let currentPage = 0;
-    let hasMore = true;
-    const tempProducts: Product[] = [];
-
+  const fetchAllProducts = async (page: number = 0, size: number = 8) => {
+    // Fetch a single page and append (or replace if page === 0)
     try {
-      while (hasMore) {
-        // 1. Fetch exactly 4 products
-        // Note: Assumes ProductService.getAllProducts is updated to handle pagination
-        const data = await ProductService.getAllProducts(currentPage, 4); 
-        
-        // 2. Add them to our list
-        tempProducts.push(...data.content);
-        setProducts([...tempProducts]);
-        setAllProducts([...tempProducts]);
+      if (page === 0) setLoading(true);
+      else setIsFetchingBatch(true);
 
-        // 3. Check if we are at the end
-        hasMore = !data.last;
-        currentPage++;
+      const data = await ProductService.getAllProducts(page, size);
 
-        if (hasMore) {
-          // 4. Show loading symbol specifically for the next batch and wait 2 seconds
-          setIsFetchingBatch(true); 
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        } else {
-          setIsFetchingBatch(false);
-        }
-        // Initial loader only for the very first fetch
-        if (currentPage === 1) setLoading(false); 
+      if (page === 0) {
+        setAllProducts(data.content);
+        setProducts(data.content);
+      } else {
+        setAllProducts((prev) => {
+          const merged = [...prev, ...data.content];
+          setProducts(merged);
+          return merged;
+        });
       }
+
+      setHasMore(!data.last);
+      setCurrentPage(page + 1);
     } catch (e) {
-      console.error("Staggered fetch failed", e);
+      console.error("Paged fetch failed", e);
     } finally {
       setLoading(false);
       setIsFetchingBatch(false);
     }
   };
 
-  const applyFilters = async () => {
-    let filtered = [...allProducts];
+  // load next page when sentinel becomes visible
+  const loadNextPage = () => {
+    // don't auto-load when filters/search active
+    if (searchTerm.trim() || selectedCategory) return;
+    if (loading || isFetchingBatch || !hasMore) return;
+    fetchAllProducts(currentPage, 8);
+  };
 
-    if (searchTerm.trim()) {
+  // IntersectionObserver to trigger loading when user scrolls to bottom
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) loadNextPage();
+        });
+      },
+      { root: null, rootMargin: "200px", threshold: 0.1 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, currentPage, loading, isFetchingBatch, hasMore]);
+
+  const applyFilters = async () => {
+    if (searchTerm.trim() || selectedCategory) {
       try {
         setLoading(true);
-        const searchResults = await ProductService.searchProducts(searchTerm);
-        filtered = searchResults;
-      } catch (e) {
-        console.error("Search failed", e);
-        filtered = filtered.filter(
-          (p) =>
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+        const categoryParam = selectedCategory
+          ? selectedCategory.toLowerCase()
+          : undefined;
+        const data = await ProductService.getAllProducts(
+          0,
+          100,
+          categoryParam,
+          searchTerm.trim() || undefined,
         );
+
+        // ✅ FIX: Filter out nulls here too
+        const validResults = data.content.filter((p: any) => p !== null);
+        setProducts(validResults);
+      } catch (e) {
+        console.error(
+          "Filtered fetch failed, falling back to client filter",
+          e,
+        );
+
+        // Fallback: Filter allProducts (which we already cleaned in fetchAllProducts)
+        let filtered = [...allProducts];
+
+        if (searchTerm.trim()) {
+          filtered = filtered.filter(
+            (p) =>
+              p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+          );
+        }
+        if (selectedCategory) {
+          filtered = filtered.filter((p) =>
+            p.categories?.includes(selectedCategory),
+          );
+        }
+        setProducts(filtered);
       } finally {
         setLoading(false);
       }
+      return;
     }
 
-    if (selectedCategory) {
-      filtered = filtered.filter((p) =>
-        p.categories?.includes(selectedCategory),
-      );
-    }
-
-    setProducts(filtered);
+    // No filters
+    setProducts(allProducts);
   };
 
   const clearFilters = () => {
@@ -156,8 +196,9 @@ export default function Home() {
     setSearchTerm("");
   };
 
-  const totalMerchantsCount = products.reduce((acc, product) => acc + (product.totalMerchants || 0), 0);
-
+  const totalMerchantsCount = products
+    .filter((p) => p !== null) // Filter out nulls first
+    .reduce((acc, product) => acc + (product.totalMerchants || 0), 0);
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Search Bar */}
@@ -173,7 +214,9 @@ export default function Home() {
             placeholder="Search by brand or model..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            onFocus={() => searchTerm && suggestions.length > 0 && setShowSuggestions(true)}
+            onFocus={() =>
+              searchTerm && suggestions.length > 0 && setShowSuggestions(true)
+            }
           />
 
           {showSuggestions && suggestions.length > 0 && (
@@ -185,14 +228,20 @@ export default function Home() {
                   className="w-full flex items-center gap-3 p-3 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors text-left"
                 >
                   <img
-                    src={suggestion.imageUrl || "https://via.placeholder.com/50"}
+                    src={
+                      suggestion.imageUrl || "https://via.placeholder.com/50"
+                    }
                     alt={suggestion.name}
                     className="w-12 h-12 rounded object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{suggestion.name}</p>
+                    <p className="font-semibold text-sm truncate">
+                      {suggestion.name}
+                    </p>
                     <p className="text-xs text-gray-500">{suggestion.brand}</p>
-                    <p className="text-sm font-bold text-black">${suggestion.lowestPrice.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-black">
+                      ${suggestion.lowestPrice.toFixed(2)}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -210,31 +259,61 @@ export default function Home() {
         )}
       </div>
 
-      {/* Category Filter Dropdown */}
-      <div className="mb-8">
-        <label className="text-sm font-black uppercase tracking-widest text-zinc-600 block mb-3">
-          Filter by Category
-        </label>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="px-4 py-3 rounded-lg border border-gray-300 bg-white font-semibold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all min-w-[250px]"
-        >
-          <option value="">All Categories</option>
+      {/* Category Filter — pill chips with small-screen fallback */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-black uppercase tracking-widest text-zinc-600 block">
+            Filter by Category
+          </label>
+          <div className="text-sm text-gray-500">
+            Choose a category to narrow results
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedCategory("")}
+            className={`px-3 py-2 text-sm rounded-full font-semibold transition-all ${selectedCategory === "" ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}
+          >
+            All
+          </button>
+
           {FILTER_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`px-3 py-2 text-sm rounded-full font-semibold transition-all ${selectedCategory === category ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}
+            >
               {category}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
+
+        {/* keep a compact select for small screens / accessibility */}
+        <div className="mt-3 lg:hidden">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white font-semibold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all"
+          >
+            <option value="">All Categories</option>
+            {FILTER_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Results Count */}
       <div className="mb-6">
         <p className="text-sm text-gray-600">
-          Showing <span className="font-bold">{products.length}</span> unique products 
+          Showing <span className="font-bold">{products.length}</span> unique
+          products
           {products.length !== 1 ? "s" : ""} available from{" "}
-          <span className="font-bold">{totalMerchantsCount}</span> different merchants
+          <span className="font-bold">{totalMerchantsCount}</span> different
+          merchants
           {selectedCategory && (
             <span className="ml-2">
               in <span className="font-bold">{selectedCategory}</span>
@@ -278,7 +357,10 @@ export default function Home() {
                   )}
                   <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
                     <img
-                      src={product.imageUrl || "https://via.placeholder.com/400x500"}
+                      src={
+                        product.imageUrl ||
+                        "https://via.placeholder.com/400x500"
+                      }
                       alt={product.name}
                       className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
                     />
@@ -311,7 +393,9 @@ export default function Home() {
                       <div className="flex items-center gap-1.5 text-zinc-400">
                         <Store size={12} />
                         <span className="text-[10px] font-black uppercase tracking-widest">
-                          {product.totalMerchants} {product.totalMerchants === 1 ? 'Seller' : 'Sellers'} available
+                          {product.totalMerchants}{" "}
+                          {product.totalMerchants === 1 ? "Seller" : "Sellers"}{" "}
+                          available
                         </span>
                       </div>
                     </div>
@@ -330,6 +414,8 @@ export default function Home() {
               </p>
             </div>
           )}
+          {/* sentinel triggers loading of next page when visible */}
+          <div ref={sentinelRef} className="h-1 w-full" />
         </>
       )}
     </div>

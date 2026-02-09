@@ -79,12 +79,19 @@ class ProductService {
    * Returns the full PagedProductResponse.
    * This allows Home.tsx to access 'data.content' and 'data.last'.
    */
-  async getAllProducts(page: number = 0, size: number = 4): Promise<PagedProductResponse> {
-    const response = await api.get("/products", {
-      params: { page, size }
-    });
+  async getAllProducts(
+    page: number = 0,
+    size: number = 4,
+    category?: string,
+    keyword?: string,
+  ): Promise<PagedProductResponse> {
+    const params: Record<string, any> = { page, size };
+    if (category) params.category = category;
+    if (keyword) params.keyword = keyword;
+
+    const response = await api.get("/products", { params });
     // Returns the Page object stored in the 'data' field of your ApiResponse
-    return response.data.data; 
+    return response.data.data;
   }
 
   async getMerchantListings(): Promise<ProductListItem[]> {
