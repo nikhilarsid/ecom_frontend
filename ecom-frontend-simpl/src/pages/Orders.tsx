@@ -657,14 +657,7 @@ export default function Orders() {
                       <span className="font-bold">Price:</span> $
                       {selectedItem.price}
                     </MetaItem>
-                    <MetaItem>
-                      <span className="font-bold">Merchant:</span>{" "}
-                      {selectedItem.merchantId}
-                    </MetaItem>
-                    <MetaItem>
-                      <MapPin size={16} />
-                      Delivery to your address
-                    </MetaItem>
+                    
                   </ItemMeta>
                 </ItemInfo>
               </ItemHeader>
