@@ -26,6 +26,7 @@ export interface ProductListItem {
   lowestPrice: number;
   totalMerchants: number;
   inStock: boolean;
+usp: string[];
   variantId: string;
 }
 

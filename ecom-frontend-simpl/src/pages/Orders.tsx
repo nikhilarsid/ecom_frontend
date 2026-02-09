@@ -392,29 +392,26 @@ export default function Orders() {
         }
 
         const hydratedItems = await Promise.all(
-          items.map(async (item: any) => {
-            const pid = item.productId || item.merchantProductId;
-            try {
-              if (pid) {
-                // Fetch from public endpoint (no auth headers)
-                const pRes = await fetch(
-                  `https://product-service-jzzf.onrender.com/api/v1/products/${pid}`
-                );
-                const pData = await pRes.json();
-                if (pData.success) {
-                  return {
-                    ...item,
-                    productName: pData.data.name,
-                    imageUrl: pData.data.imageUrls?.[0],
-                  };
-                }
-              }
-            } catch (e) {
-              console.warn("Image fetch failed", pid);
-            }
-            return item;
-          })
-        );
+  items.map(async (item: any) => {
+    try {
+      // Use the productId from the order response to fetch details
+      const pRes = await fetch(
+        `https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`
+      );
+      const pData = await pRes.json();
+      if (pData.success) {
+        return {
+          ...item,
+          productName: pData.data.name,
+          imageUrl: pData.data.imageUrls?.[0], // Get the actual product image
+        };
+      }
+    } catch (e) {
+      console.warn("Details fetch failed for product:", item.productId);
+    }
+    return item;
+  })
+);
 
         setOrderDetails((prev) => ({ ...prev, [orderId]: hydratedItems }));
         setExpandedOrder(orderId);
@@ -654,14 +651,7 @@ export default function Orders() {
                       <span className="font-bold">Price:</span> $
                       {selectedItem.price}
                     </MetaItem>
-                    <MetaItem>
-                      <span className="font-bold">Merchant:</span>{" "}
-                      {selectedItem.merchantId}
-                    </MetaItem>
-                    <MetaItem>
-                      <MapPin size={16} />
-                      Delivery to your address
-                    </MetaItem>
+                    
                   </ItemMeta>
                 </ItemInfo>
               </ItemHeader>

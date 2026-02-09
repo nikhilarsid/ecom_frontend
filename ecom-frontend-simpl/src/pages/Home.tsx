@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, HardDrive, Palette, Loader2, X } from "lucide-react";
+import { Search, HardDrive, Palette, Loader2, X, Store } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProductService, { ProductListItem } from "../services/ProductService";
 
@@ -50,28 +50,25 @@ export default function Home() {
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
 
-    // Clear previous timer
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
 
-    // If search is empty, clear suggestions
     if (!value.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    // Set new timer for debounced search
     debounceTimer.current = setTimeout(() => {
       fetchSuggestions(value);
-    }, 300); // 300ms debounce
+    }, 300);
   };
 
   const fetchSuggestions = async (query: string) => {
     try {
       const results = await ProductService.searchProducts(query);
-      setSuggestions(results.slice(0, 8)); // Show top 8 suggestions
+      setSuggestions(results.slice(0, 8));
       setShowSuggestions(true);
     } catch (e) {
       console.error("Suggestions fetch failed", e);
@@ -100,7 +97,6 @@ export default function Home() {
   const applyFilters = async () => {
     let filtered = [...allProducts];
 
-    // If there's a search term, use the API search instead
     if (searchTerm.trim()) {
       try {
         setLoading(true);
@@ -108,7 +104,6 @@ export default function Home() {
         filtered = searchResults;
       } catch (e) {
         console.error("Search failed", e);
-        // Fallback to local filtering
         filtered = filtered.filter(
           (p) =>
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,7 +114,6 @@ export default function Home() {
       }
     }
 
-    // Filter by selected category
     if (selectedCategory) {
       filtered = filtered.filter((p) =>
         p.categories?.includes(selectedCategory),
@@ -133,6 +127,8 @@ export default function Home() {
     setSelectedCategory("");
     setSearchTerm("");
   };
+
+  const totalMerchantsCount = products.reduce((acc, product) => acc + (product.totalMerchants || 0), 0);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -152,7 +148,6 @@ export default function Home() {
             onFocus={() => searchTerm && suggestions.length > 0 && setShowSuggestions(true)}
           />
 
-          {/* Suggestions Dropdown */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
               {suggestions.map((suggestion) => (
@@ -209,8 +204,9 @@ export default function Home() {
       {/* Results Count */}
       <div className="mb-6">
         <p className="text-sm text-gray-600">
-          Showing <span className="font-bold">{products.length}</span> product
-          {products.length !== 1 ? "s" : ""}
+          Showing <span className="font-bold">{products.length}</span> unique products 
+          {products.length !== 1 ? "s" : ""} available from{" "}
+          <span className="font-bold">{totalMerchantsCount}</span> different merchants
           {selectedCategory && (
             <span className="ml-2">
               in <span className="font-bold">{selectedCategory}</span>
@@ -241,42 +237,60 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
             <Link
-  key={`${product.productId}-${product.variantId}`}
-  to={`/product/${product.productId}?variantId=${product.variantId}`}
-  className="block group h-full"
->
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative flex flex-col h-full">
-    {!product.inStock && (
-      <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
-        Out of Stock
-      </div>
-    )}
-    {/* Fixed Aspect Ratio Container */}
-    <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
-      <img
-        src={product.imageUrl || "https://via.placeholder.com/400x500"}
-        alt={product.name}
-        className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
-      />
-    </div>
-    <div className="p-4 flex flex-col flex-grow justify-between">
-      <div>
-        <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
-          {product.brand}
-        </span>
-        <h3 className="text-lg font-bold mt-1 leading-tight line-clamp-2">
-          {product.name}
-        </h3>
-      </div>
+              key={`${product.productId}-${product.variantId}`}
+              to={`/product/${product.productId}?variantId=${product.variantId}`}
+              className="block group h-full"
+            >
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative flex flex-col h-full">
+                {!product.inStock && (
+                  <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
+                    Out of Stock
+                  </div>
+                )}
+                <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
+                  <img
+                    src={product.imageUrl || "https://via.placeholder.com/400x500"}
+                    alt={product.name}
+                    className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-4 flex flex-col flex-grow justify-between">
+                  <div>
+                    <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
+                      {product.brand}
+                    </span>
 
-      <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-50">
-        <span className="text-xl font-bold">
-          ${product.lowestPrice.toFixed(2)}
-        </span>
-      </div>
-    </div>
-  </div>
-</Link>
+                    {/* PROFESSIONALLY RENDER THE FIRST USP AS A TAG */}
+                    {product.usp && product.usp.length > 0 && (
+                      <div className="mt-1 mb-2">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-black bg-zinc-100 px-1.5 py-0.5 rounded">
+                          {product.usp[0]}
+                        </span>
+                      </div>
+                    )}
+
+                    <h3 className="text-lg font-bold mt-1 leading-tight line-clamp-2">
+                      {product.name}
+                    </h3>
+                  </div>
+
+                  <div className="mt-4 pt-2 border-t border-gray-50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xl font-bold">
+                        ${product.lowestPrice.toFixed(2)}
+                      </span>
+                    </div>
+                    {/* Merchant Count Badge */}
+                    <div className="flex items-center gap-1.5 text-zinc-400">
+                      <Store size={12} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {product.totalMerchants} {product.totalMerchants === 1 ? 'Seller' : 'Sellers'} available
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       )}
