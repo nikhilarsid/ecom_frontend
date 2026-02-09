@@ -132,8 +132,8 @@ class ProductService {
     return response.data;
   }
 
-  async searchProducts(keyword: string): Promise<ProductListItem[]> {
-    const response = await api.get("/products/search", { params: { keyword } });
+  async searchProducts(q: string): Promise<ProductListItem[]> {
+    const response = await api.get("/products/search", { params: { q } });
     return response.data.data;
   }
 }

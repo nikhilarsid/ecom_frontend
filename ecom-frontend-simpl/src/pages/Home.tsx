@@ -42,6 +42,7 @@ export default function Home() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -56,6 +57,30 @@ export default function Home() {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // close suggestions when clicking outside or pressing Escape
+  useEffect(() => {
+    const outsideHandler = (e: MouseEvent) => {
+      const sug = suggestionsRef.current;
+      const input = searchInputRef.current;
+      if (e.target instanceof Node) {
+        if (sug && sug.contains(e.target)) return;
+        if (input && input.contains(e.target)) return;
+        setShowSuggestions(false);
+      }
+    };
+
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSuggestions(false);
+    };
+
+    document.addEventListener("mousedown", outsideHandler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", outsideHandler);
+      document.removeEventListener("keydown", keyHandler);
+    };
   }, []);
 
   useEffect(() => {
@@ -158,43 +183,47 @@ export default function Home() {
   }, [sentinelRef.current, currentPage, loading, isFetchingBatch, hasMore]);
 
   const applyFilters = async () => {
-    if (searchTerm.trim() || selectedCategory) {
+    // If user entered a search term, use the search API results directly
+    if (searchTerm.trim()) {
       try {
         setLoading(true);
-        const categoryParam = selectedCategory
-          ? selectedCategory.toLowerCase()
-          : undefined;
-        const data = await ProductService.getAllProducts(
-          0,
-          100,
-          categoryParam,
-          searchTerm.trim() || undefined,
-        );
+        const searchResults = await ProductService.searchProducts(searchTerm.trim());
 
-        // ✅ FIX: Filter out nulls here too
+        // Filter by category client-side only if a category is also selected
+        const validResults = (searchResults || []).filter((p: any) => p !== null);
+        const final = selectedCategory
+          ? validResults.filter((p) => p.categories?.includes(selectedCategory))
+          : validResults;
+        setProducts(final);
+      } catch (e) {
+        console.error("Search fetch failed, falling back to client filter", e);
+        // Fallback: apply client-side search over loaded products
+        let filtered = [...allProducts];
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
+        );
+        if (selectedCategory) {
+          filtered = filtered.filter((p) => p.categories?.includes(selectedCategory));
+        }
+        setProducts(filtered);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // If only category is set (no search term), prefer server-side category fetch
+    if (selectedCategory) {
+      try {
+        setLoading(true);
+        const data = await ProductService.getAllProducts(0, 100, selectedCategory.toLowerCase());
         const validResults = data.content.filter((p: any) => p !== null);
         setProducts(validResults);
       } catch (e) {
-        console.error(
-          "Filtered fetch failed, falling back to client filter",
-          e,
-        );
-
-        // Fallback: Filter allProducts (which we already cleaned in fetchAllProducts)
-        let filtered = [...allProducts];
-
-        if (searchTerm.trim()) {
-          filtered = filtered.filter(
-            (p) =>
-              p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
-          );
-        }
-        if (selectedCategory) {
-          filtered = filtered.filter((p) =>
-            p.categories?.includes(selectedCategory),
-          );
-        }
+        console.error("Category fetch failed, falling back to client filter", e);
+        const filtered = allProducts.filter((p) => p.categories?.includes(selectedCategory));
         setProducts(filtered);
       } finally {
         setLoading(false);
@@ -229,13 +258,16 @@ export default function Home() {
             placeholder="Search by brand or model..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            onFocus={() =>
-              searchTerm && suggestions.length > 0 && setShowSuggestions(true)
-            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setShowSuggestions(false);
+              }
+            }}
+            onFocus={() => searchTerm && suggestions.length > 0 && setShowSuggestions(true)}
           />
 
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+            <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
               {suggestions.map((suggestion) => (
                 <button
                   key={`${suggestion.productId}-${suggestion.variantId}`}
