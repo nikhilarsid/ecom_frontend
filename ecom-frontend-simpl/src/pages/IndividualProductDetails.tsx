@@ -7,10 +7,12 @@ import {
   Loader2,
   Minus,
   Plus,
-  AlertCircle,
-  Store,
-  Trash2
+  Trash2,
+  ShieldCheck,
+  Zap
 } from "lucide-react";
+import AuthModal from "../components/AuthModal";
+import { showToast } from "../utils/toast";
 
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
 const Spinner = styled(Loader2)`animation: ${spin} 1s linear infinite;`;
@@ -33,12 +35,14 @@ export default function IndividualProductDetails() {
   const variantId = searchParams.get("variantId");
   const navigate = useNavigate();
   const currentUserEmail = localStorage.getItem("userName");
+  const token = localStorage.getItem("token");
 
   const [product, setProduct] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [status, setStatus] = useState<{ msg: string; type: "error" | "success" } | null>(null);
   
   // Review Form State
@@ -48,7 +52,6 @@ export default function IndividualProductDetails() {
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
 
   const getHeaders = () => {
-    const token = localStorage.getItem("token");
     return {
       "Content-Type": "application/json",
       ...(token && token !== "null" ? { Authorization: `Bearer ${token}` } : {}),
@@ -68,75 +71,58 @@ export default function IndividualProductDetails() {
     } catch (e) { console.error("Product fetch failed", e); }
   };
 
-  const fetchReviews = async (merchantId: string) => {
-    if (!id || !merchantId) return;
-    const cleanId = id.replace(':', '');
-    console.log(`[LOG] Fetching reviews for Product: ${cleanId}, Merchant: ${merchantId}`);
-    
-    try {
-      const rRes = await fetch(`https://review-service-z6zl.onrender.com/api/v1/reviews/view?productId=${cleanId}&merchantId=${merchantId}`, { 
-        headers: getHeaders() 
-      });
+  // Update the fetchReviews function
+const fetchReviews = async () => {
+  if (!id) return;
+  const cleanId = id.replace(':', '');
+  try {
+    // New endpoint: fetches all reviews for the product
+    const rRes = await fetch(`https://review-service-z6zl.onrender.com/api/v1/reviews/product/${cleanId}`, { 
+      headers: getHeaders() 
+    });
+    if (rRes.ok) {
+      const rJson = await rRes.json();
+      setReviews(rJson || []);
       
-      if (rRes.ok) {
-        const rJson = await rRes.json();
-        console.log("[LOG] Reviews Received:", rJson);
-        setReviews(rJson || []);
-        
-        // Find if current user already reviewed this SPECIFIC variant with this merchant
-        const existing = rJson.find((r: any) => 
-          r.userName === currentUserEmail && r.variantId === variantId
-        );
-        
-        if (existing) {
-          console.log("[LOG] User has existing review. Setting ID:", existing.id);
-          setEditingReviewId(existing.id);
-          setUserRating(existing.rating);
-          setUserComment(existing.comment);
-        } else {
-          setEditingReviewId(null);
-          setUserComment("");
-          setUserRating(5);
-        }
+      // Keep existing logic to find if current user reviewed this specific variant
+      const existing = rJson.find((r: any) => r.userName === currentUserEmail && r.variantId === variantId);
+      if (existing) {
+        setEditingReviewId(existing.id);
+        setUserRating(existing.rating);
+        setUserComment(existing.comment);
+      } else {
+        setEditingReviewId(null);
+        setUserComment("");
+        setUserRating(5);
       }
-    } catch (e) { console.error("[ERROR] Review fetch failed", e); }
-  };
+    }
+  } catch (e) { console.error("Review fetch failed", e); }
+};
+
+// Update useEffect to trigger on product ID change
+useEffect(() => { 
+  fetchReviews(); 
+}, [id, variantId]);
 
   useEffect(() => { fetchData(); }, [id, variantId]);
   useEffect(() => { if (selectedMerchantForReview) fetchReviews(selectedMerchantForReview); }, [selectedMerchantForReview, variantId]);
 
   const handleReviewAction = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) { setShowAuthModal(true); return; }
     if (!userComment.trim() || !selectedMerchantForReview) return;
 
     setIsReviewing(true);
     setStatus(null);
 
-    // SANITIZE TYPES: productId MUST be a Number for the Create API
     const productIdNum = Number(id?.replace(':', ''));
-    
     const payload = editingReviewId 
-      ? { rating: userRating, comment: userComment } // Update Body
-      : { // Create Body
-          productId: productIdNum, 
-          variantId: variantId, 
-          merchantId: selectedMerchantForReview, 
-          rating: userRating, 
-          comment: userComment 
-        };
+      ? { rating: userRating, comment: userComment }
+      : { productId: productIdNum, variantId, merchantId: selectedMerchantForReview, rating: userRating, comment: userComment };
 
     const url = editingReviewId 
       ? `https://review-service-z6zl.onrender.com/api/v1/reviews/update/${editingReviewId}`
       : `https://review-service-z6zl.onrender.com/api/v1/reviews/create`;
-
-    console.log(`[LOG] Review Action: ${editingReviewId ? 'UPDATE' : 'CREATE'}`);
-    console.log("[LOG] Request URL:", url);
-    console.log("[LOG] Request Payload:", payload);
-    console.log("[LOG] Payload Types:", {
-        productId: typeof payload.productId,
-        rating: typeof payload.rating,
-        variantId: typeof payload.variantId
-    });
 
     try {
       const res = await fetch(url, { 
@@ -144,49 +130,39 @@ export default function IndividualProductDetails() {
         headers: getHeaders(), 
         body: JSON.stringify(payload) 
       });
-      
-      console.log("[LOG] Response Status:", res.status);
       const resJson = await res.json();
-      console.log("[LOG] Server Response Body:", resJson);
 
       if (res.ok) {
-        setStatus({ msg: editingReviewId ? "Review updated!" : "Review published!", type: "success" });
+        showToast.success(editingReviewId ? "Review updated!" : "Feedback published!");
         fetchReviews(selectedMerchantForReview);
       } else {
         setStatus({ msg: resJson.message || `Error ${res.status}`, type: "error" });
       }
-    } catch (e) {
-      console.error("[ERROR] Network failure", e);
-      setStatus({ msg: "Service unreachable", type: "error" });
-    } finally { setIsReviewing(false); }
+    } catch (e) { setStatus({ msg: "Service unreachable", type: "error" }); } finally { setIsReviewing(false); }
   };
 
   const handleDeleteReview = async () => {
-    if (!editingReviewId || !window.confirm("Delete your review permanently?")) return;
-    
-    console.log(`[LOG] Deleting Review ID: ${editingReviewId}`);
+    if (!editingReviewId) return;
     try {
       const res = await fetch(`https://review-service-z6zl.onrender.com/api/v1/reviews/delete/${editingReviewId}`, {
         method: "DELETE",
         headers: getHeaders()
       });
       if (res.ok) {
-        setStatus({ msg: "Review deleted successfully.", type: "success" });
+        showToast.success("Review deleted");
         setEditingReviewId(null);
         setUserComment("");
         fetchReviews(selectedMerchantForReview);
-      } else {
-        console.error("[ERROR] Delete failed with status:", res.status);
       }
-    } catch (e) { console.error("[ERROR] Delete Network error", e); }
+    } catch (e) { console.error("Delete error", e); }
   };
 
-  // Cart Logic (Retained from previous version)
   const handleAddToCart = async (specificMerchantId?: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) { navigate("/login"); return; }
+    if (!token) { setShowAuthModal(true); return; }
+    
     const targetMerchantId = specificMerchantId || product.sellers[0]?.merchantId;
     if (!targetMerchantId) return;
+    
     setIsAdding(true);
     try {
       const cleanId = Number(id?.replace(':', ''));
@@ -197,102 +173,168 @@ export default function IndividualProductDetails() {
       });
       if (res.ok) {
         window.dispatchEvent(new Event("cartUpdated"));
-        setStatus({ msg: "Added to cart", type: "success" });
+        showToast.success("Added to Bag");
       }
-    } catch (e) { setStatus({ msg: "Cart operation failed", type: "error" }); } finally { setIsAdding(false); }
+    } catch (e) { showToast.error("Failed to add to cart"); } finally { setIsAdding(false); }
   };
 
-  if (!product) return <div className="flex justify-center py-20"><Spinner size={40} /></div>;
+  if (!product) return <div className="flex justify-center py-40"><Spinner size={40} /></div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-16">
-        <div className="lg:col-span-1">
-          <div className="aspect-[3/4] bg-zinc-50 rounded-[2rem] border flex items-center justify-center overflow-hidden">
-            <img src={product.imageUrls?.[0]} alt={product.name} className="w-full h-full object-contain p-6" />
+    <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 mb-20">
+        {/* Left: Product Media */}
+        <div className="space-y-4">
+          <div className="aspect-square bg-white rounded-[3rem] border border-zinc-100 flex items-center justify-center overflow-hidden shadow-sm group">
+            <img 
+              src={product.imageUrls?.[0]} 
+              alt={product.name} 
+              className="w-full h-full object-contain p-12 group-hover:scale-105 transition-transform duration-700" 
+            />
+          </div>
+          <div className="flex gap-4">
+             <div className="flex-1 bg-zinc-50 rounded-2xl p-6 flex items-center gap-3">
+                <ShieldCheck className="text-zinc-400" size={20}/>
+                <span className="text-[10px] font-black uppercase tracking-widest">Genuine Product</span>
+             </div>
+             <div className="flex-1 bg-zinc-50 rounded-2xl p-6 flex items-center gap-3">
+                <Zap className="text-zinc-400" size={20}/>
+                <span className="text-[10px] font-black uppercase tracking-widest">Fast Delivery</span>
+             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-2 space-y-8">
-          <div>
-            <span className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.4em]">{product.brand}</span>
-            <h1 className="text-5xl lg:text-6xl font-black tracking-tighter mt-4 leading-none">{product.name}</h1>
+        {/* Right: Info & Actions */}
+        <div className="flex flex-col">
+          <div className="mb-8">
+            <span className="text-zinc-400 text-[20px] font-black uppercase tracking-[0.5em]">{product.brand}</span>
+            <h1 className="text-5xl lg:text-7xl font-black tracking-tighter mt-4 leading-[0.9]">{product.name}</h1>
           </div>
 
-          <p className="text-zinc-600 text-lg leading-relaxed">{product.description}</p>
-
-          {/* Offers List */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase text-zinc-400">Available Offers</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {product.sellers?.map((seller: any) => (
-                <div key={seller.merchantId} className={`bg-white border p-6 rounded-[2rem] transition-all ${selectedMerchantForReview === seller.merchantId ? 'border-black ring-1 ring-black' : 'border-zinc-100'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-black text-lg">{seller.merchantName}</h4>
-                    <button onClick={() => setSelectedMerchantForReview(seller.merchantId)} className="text-zinc-300 hover:text-black">
-                      <Star size={16} fill={selectedMerchantForReview === seller.merchantId ? "black" : "none"} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-black text-3xl">${seller.price.toFixed(2)}</span>
-                    <button onClick={() => handleAddToCart(seller.merchantId)} disabled={seller.stock === 0} className="bg-black text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase">Add</button>
-                  </div>
-                </div>
-              ))}
+          <div className="flex items-center gap-4 mb-10">
+            <div className="flex bg-black text-white px-3 py-1 rounded-full items-center gap-1.5">
+              <Star size={12} fill="white"/>
+              <span className="text-xs font-black">4.8</span>
             </div>
+            <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">{reviews.length} Reviews</span>
           </div>
 
-          {status && <FeedbackBanner $type={status.type}>{status.msg}</FeedbackBanner>}
+          <p className="text-zinc-500 text-lg leading-relaxed mb-12 max-w-xl">{product.description}</p>
 
-          {/* Action Bar */}
-          <div className="flex items-center gap-6 pt-6 border-t">
-             <div className="flex items-center bg-zinc-100 rounded-2xl p-1">
-                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center"><Minus size={14}/></button>
-                <span className="px-4 font-black">{quantity}</span>
-                <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center"><Plus size={14}/></button>
-             </div>
-             <button onClick={() => handleAddToCart()} disabled={isAdding} className="flex-1 bg-black text-white h-14 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                {isAdding ? <Spinner size={20} /> : <ShoppingCart size={20} />} Add to Cart
-             </button>
+          <div className="space-y-6 mb-12">
+            {/* <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Merchant Offers</h3> */}
+            <div className="space-y-6 mb-12">
+  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Merchant Offers</h3>
+  {/* Update: Changed flex-col to a grid with 2 columns or flex-row */}
+  <div className="flex flex-row gap-4 overflow-x-auto pb-4 no-scrollbar">
+    {product.sellers?.map((seller: any) => (
+      <div 
+        key={seller.merchantId} 
+        className={`flex-shrink-0 w-[280px] p-6 rounded-3xl border transition-all cursor-pointer ${selectedMerchantForReview === seller.merchantId ? 'border-black bg-white shadow-xl' : 'border-zinc-100 bg-zinc-50/50'}`}
+        onClick={() => setSelectedMerchantForReview(seller.merchantId)}
+      >
+        <div className="flex flex-col">
+          <span className="font-black text-sm uppercase tracking-tight">
+            {/* Display fallback chain: Store Name -> First Name -> Last Name */}
+            {seller.merchantName.split('@')[0]|| seller.firstName || seller.lastName || "Independent Seller"}
+          </span>
+          <span className="text-zinc-400 text-[10px] font-bold">In Stock: {seller.stock}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-black text-2xl">${seller.price.toFixed(2)}</span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleAddToCart(seller.merchantId); }}
+            className="bg-black text-white px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
           </div>
 
-          {/* Review Section */}
-          <div className="pt-16 border-t">
-            <h3 className="text-3xl font-black italic uppercase mb-8">Feedback for {selectedMerchantForReview}</h3>
-            
-            <form onSubmit={handleReviewAction} className="space-y-4 bg-zinc-50 p-8 rounded-[2rem] border">
-              <h4 className="font-bold text-lg">{editingReviewId ? "Update Your Review" : "Post a Review"}</h4>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map(n => (
-                  <Star key={n} size={24} onClick={() => setUserRating(n)} fill={n <= userRating ? "black" : "none"} className="cursor-pointer" />
-                ))}
-              </div>
-              <textarea value={userComment} onChange={e => setUserComment(e.target.value)} placeholder="How was your experience?" className="w-full p-4 rounded-xl border-none bg-white min-h-[100px]" />
-              <div className="flex gap-2">
-                <button type="submit" disabled={isReviewing} className="flex-1 bg-black text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest">
-                  {isReviewing ? <Spinner size={16}/> : (editingReviewId ? "Update Review" : "Post Review")}
-                </button>
-                {editingReviewId && (
-                  <button type="button" onClick={handleDeleteReview} className="bg-red-500 text-white px-4 rounded-xl hover:bg-red-600"><Trash2 size={18}/></button>
-                )}
-              </div>
-            </form>
+          <div className="mt-auto pt-10 border-t border-zinc-100 flex items-center gap-6">
+            <div className="flex items-center bg-zinc-100 rounded-2xl p-1">
+              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="w-12 h-12 flex items-center justify-center hover:bg-white rounded-xl transition-all"><Minus size={16}/></button>
+              <span className="px-6 font-black text-lg">{quantity}</span>
+              <button onClick={() => setQuantity(q => q + 1)} className="w-12 h-12 flex items-center justify-center hover:bg-white rounded-xl transition-all"><Plus size={16}/></button>
+            </div>
+            <button 
+              onClick={() => handleAddToCart()} 
+              disabled={isAdding}
+              className="flex-1 bg-black text-white h-16 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {isAdding ? <Spinner size={20} /> : <ShoppingCart size={20} />} Add to Bag
+            </button>
+          </div>
+        </div>
+      </div>
 
-            <div className="mt-8 space-y-4">
+      {/* Reviews & Feedback Section */}
+      <div className="pt-20 border-t border-zinc-100">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-20">
+          <div>
+            <h3 className="text-4xl font-black tracking-tighter uppercase italic leading-none mb-6">Product<br/>Feedback</h3>
+            <p className="text-zinc-400 text-sm font-medium leading-relaxed">Showing verified customer experiences for the product.</p>
+          </div>
+
+          <div className="lg:col-span-2 space-y-12">
+            <form onSubmit={handleReviewAction} className="bg-zinc-50 p-6 rounded-[1.5rem] border border-zinc-100 max-w-xl">
+  <h4 className="font-black text-sm uppercase mb-4 tracking-tight">
+    {editingReviewId ? "Update Review" : "Rate this store"}
+  </h4>
+  <div className="flex gap-1 mb-4">
+    {[1, 2, 3, 4, 5].map(n => (
+      <Star 
+        key={n} 
+        size={20} // Reduced size
+        onClick={() => setUserRating(n)} 
+        fill={n <= userRating ? "black" : "none"} 
+        className="cursor-pointer" 
+      />
+    ))}
+  </div>
+  <textarea 
+    value={userComment} 
+    onChange={e => setUserComment(e.target.value)} 
+    placeholder="Quick feedback..." 
+    className="w-full p-3 rounded-xl border-none bg-white min-h-[80px] mb-4 text-sm outline-none" 
+  />
+  <button type="submit" disabled={isReviewing} className="w-full bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+    {isReviewing ? <Spinner size={14}/> : "Submit"}
+  </button>
+</form>
+
+            <div className="space-y-6">
               {reviews.map((r: any) => (
-                <div key={r.id} className="p-6 bg-white border border-zinc-100 rounded-2xl">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-bold text-sm text-zinc-900">{r.userName}</span>
-                    <div className="flex gap-0.5">{[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < r.rating ? "black" : "#eee"} stroke="none" />)}</div>
+                <div key={r.id} className="p-8 bg-white border border-zinc-100 rounded-[2rem] hover:shadow-lg transition-shadow">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center font-black text-xs uppercase">
+                        {r.userName.charAt(0)}
+                      </div>
+                      <span className="font-black text-sm uppercase tracking-tight">{r.userName.split('@')[0]}</span>
+                    </div>
+                    <div className="flex gap-0.5">
+                      {[...Array(5)].map((_, i) => <Star key={i} size={10} fill={i < r.rating ? "black" : "#eee"} stroke="none" />)}
+                    </div>
                   </div>
-                  <p className="text-zinc-600 text-sm leading-relaxed">{r.comment}</p>
+                  <p className="text-zinc-500 text-sm leading-relaxed italic">"{r.comment}"</p>
                 </div>
               ))}
-              {reviews.length === 0 && <p className="text-zinc-400 text-sm text-center py-10 italic">Be the first to review this merchant.</p>}
+              {reviews.length === 0 && (
+                <div className="text-center py-20 bg-zinc-50 rounded-[2rem] border border-dashed border-zinc-200">
+                  <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest italic">No feedback yet for this merchant.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 }

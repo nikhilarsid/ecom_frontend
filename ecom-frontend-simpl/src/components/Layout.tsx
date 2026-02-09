@@ -127,19 +127,21 @@ export default function Layout({ children }: { children: ReactNode }) {
       });
       const json = await res.json();
       if (json.success) {
-        setCartCount(json.data.items.length);
-      }
+    // Change: sum the quantity of each item instead of using items.length
+    const totalQuantity = json.data.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+    setCartCount(totalQuantity);
+  }
     } catch (e) {
       console.error("Cart count fetch failed", e);
     }
   };
 
   const syncAuth = () => {
-    setToken(localStorage.getItem('token'));
-    setRole(localStorage.getItem('role'));
-    setUserName(localStorage.getItem('userName'));
-    fetchCartCount();
-  };
+  setToken(localStorage.getItem('token'));
+  setRole(localStorage.getItem('role'));
+  setUserName(localStorage.getItem('firstName')); 
+  fetchCartCount();
+};
 
   useEffect(() => {
     syncAuth();

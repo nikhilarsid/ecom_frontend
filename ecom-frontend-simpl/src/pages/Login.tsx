@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { Loader2, ArrowRight } from 'lucide-react';
+import { showToast } from '../utils/toast';
 
 const AuthContainer = styled.div`
   max-width: 400px;
@@ -28,6 +29,8 @@ export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || "/";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,31 +45,21 @@ export default function Login() {
       const data = await res.json();
 
       if (data.token) {
-        // Essential authentication data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('role', data.role);
-
-        /**
-         * FIX: Since data.email is not returned by the API, we use formData.email.
-         * This ensures the Merchant Dashboard and Analytics APIs have the 
-         * required identifier to fetch stats.
-         */
-        localStorage.setItem('userName', formData.email); 
-        
-        // Store the first name for the "Hi, Alice" greeting
-        // Fallback to "User" if data.firstName is also missing
-        localStorage.setItem('firstName', data.firstName || "User");
-        
-        // Redirect logic based on role
-        if (data.role === 'MERCHANT') {
-          navigate('/merchant/dashboard');
-        } else {
-          navigate('/');
-        }
-
-        // Trigger navbar/layout refresh
-        window.dispatchEvent(new Event("authChange"));
-      } else {
+  localStorage.setItem('token', data.token);
+  localStorage.setItem('role', data.role);
+  localStorage.setItem('userName', formData.email); // Store email for API calls
+  
+  // Explicitly store firstName for the 'Hi, Name' greeting
+  const greetingName = data.firstName || formData.email.split('@')[0];
+  localStorage.setItem('firstName', greetingName); 
+  
+  window.dispatchEvent(new Event("authChange"));
+  showToast.success("Welcome back!");
+      window.dispatchEvent(new Event("authChange"));
+      
+      // Redirect back to the product page instead of Home
+      navigate(data.role === 'MERCHANT' ? '/merchant/dashboard' : from, { replace: true });
+} else {
         alert("Login failed. Check credentials.");
       }
     } catch (e) {

@@ -11,6 +11,7 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
+import { showToast } from "../utils/toast";
 
 // --- ANIMATIONS ---
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
@@ -109,89 +110,65 @@ export default function Cart() {
       return;
     }
 
-    try {
-      const res = await fetch(
-        "https://order-service-p792.onrender.com/api/cart/view",
-        {
-          headers: getHeaders(),
-        },
-      );
+     try {
+    const res = await fetch("https://order-service-p792.onrender.com/api/cart/view", { headers: getHeaders() });
+    const json = await res.json();
+    
+    if (json.success) {
+      setCart(json.data);
+      const items = json.data.items || [];
 
-      if (res.status === 403) {
-        setError(
-          "Your session has expired or you are unauthorized. Please re-authenticate.",
-        );
-        return;
-      }
-
-      const json = await res.json();
-      if (json.success) {
-        setCart(json.data);
-
-        // --- ✅ FIX: Use LocalStorage Cache First ---
-        const cartDetails = JSON.parse(
-          localStorage.getItem("cartDetails") || "{}",
-        );
-        const items = json.data.items || [];
-
-        const mergedItems = await Promise.all(
-          items.map(async (item: any) => {
-            // 1. Try LocalStorage
-            const cacheKey = `${item.productId}-${item.variantId}-${item.merchantId}`;
-            const cached = cartDetails[cacheKey];
-
-            if (cached) {
-              return { ...item, ...cached };
-            }
-
-            // 2. If missing, try simple fetch (Optional - removes 403 risk if disabled)
-            // We disable the fetch fallback here to guarantee no 403 errors.
-            // If it's not in cache, it just shows "Product" placeholder.
+      // Fetch full details for each cart item
+      const mergedItems = await Promise.all(
+        items.map(async (item: any) => {
+          try {
+            const pRes = await fetch(`https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`);
+            const pJson = await pRes.json();
             return {
               ...item,
-              productName: "Product",
-              imageUrl: null,
-              specs: {},
+              productName: pJson.data.name,
+              imageUrl: pJson.data.imageUrls?.[0],
+              brand: pJson.data.brand
             };
-          }),
-        );
-
-        setEnrichedItems(mergedItems);
-      } else {
-        setError("Your cart could not be synchronized with the server.");
-      }
-    } catch (e) {
+          } catch (e) {
+            return { ...item, productName: "Product" };
+          }
+        })
+      );
+      setEnrichedItems(mergedItems);
+    }
+  } catch (e) {
       setError("Network timeout. Unable to reach the Ethereal Order Service.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteItem = async (itemId: string, quantity: number) => {
-    setDeleting(Number(itemId));
-    try {
-      const res = await fetch(
-        `https://order-service-p792.onrender.com/api/cart/deleteItem/${itemId}?quantity=${quantity}`,
-        {
-          method: "DELETE",
-          headers: getHeaders(),
-        },
-      );
-
-      const json = await res.json();
-
-      if (json.success) {
-        await fetchCart();
-        window.dispatchEvent(new Event("cartUpdated"));
-      } else {
-        alert("Failed to remove item: " + json.message);
+  const handleDeleteItem = async (itemId: string, currentQuantity: number) => {
+  // Use the specific itemId from the Cart API (e.g., 390002)
+  setDeleting(Number(itemId));
+  try {
+    // We send the full quantity to ensure the item is entirely removed
+    const res = await fetch(
+      `https://order-service-p792.onrender.com/api/cart/deleteItem/${itemId}?quantity=${currentQuantity}`,
+      {
+        method: "DELETE",
+        headers: getHeaders(),
       }
-    } catch (e) {
-      alert("Network error. Could not remove item.");
-    } finally {
-      setDeleting(null);
+    );
+
+    const json = await res.json();
+    if (json.success) {
+      await fetchCart();
+      window.dispatchEvent(new Event("cartUpdated"));
+      showToast.success("Item removed from cart");
     }
-  };
+  } catch (e) {
+    showToast.error("Failed to remove item");
+  } finally {
+    setDeleting(null);
+  }
+};
 
   // Quantity adjustment state
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
@@ -326,15 +303,12 @@ export default function Cart() {
     <CartContainer>
       <div className="flex justify-between items-end mb-12">
         <div>
-          <h1 className="text-6xl font-black tracking-tighter italic uppercase leading-none">
-            Your Cart
-          </h1>
+          <h1 className="text-xl font-black tracking-tighter italic uppercase leading-none">
+          Your Cart
+        </h1>
           <p className="text-zinc-400 font-bold text-xs uppercase tracking-[0.4em] mt-4">
             Review Your Selection
           </p>
-        </div>
-        <div className="bg-zinc-100 px-4 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">
-          {displayItems.length} Items
         </div>
       </div>
 
@@ -419,19 +393,17 @@ export default function Cart() {
               <p className="font-black text-2xl tracking-tighter mb-4">
                 ${(item.price * item.quantity).toLocaleString()}
               </p>
-              <button
-                onClick={() =>
-                  handleDeleteItem(item.merchantProductId, item.quantity)
-                }
-                disabled={deleting === Number(item.merchantProductId)}
-                className="text-zinc-300 hover:text-red-500 transition-colors p-2 disabled:opacity-50"
-              >
-                {deleting === Number(item.merchantProductId) ? (
-                  <Spinner size={20} />
-                ) : (
-                  <Trash2 size={20} />
-                )}
-              </button>
+             <button
+  onClick={() => handleDeleteItem(item.itemId, item.quantity)} // Ensure item.itemId is used
+  disabled={deleting === Number(item.itemId)}
+  className="text-zinc-300 hover:text-red-500 transition-colors p-2"
+>
+  {deleting === Number(item.itemId) ? (
+    <Spinner size={20} />
+  ) : (
+    <Trash2 size={20} />
+  )}
+</button>
             </div>
           </CartItem>
         ))}
