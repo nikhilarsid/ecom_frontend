@@ -34,6 +34,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [isFetchingBatch, setIsFetchingBatch] = useState(false); // Track batch loading specifically
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,13 +85,40 @@ export default function Home() {
 
   const fetchAllProducts = async () => {
     setLoading(true);
+    let currentPage = 0;
+    let hasMore = true;
+    const tempProducts: Product[] = [];
+
     try {
-      const data = await ProductService.getAllProducts();
-      setAllProducts(data);
+      while (hasMore) {
+        // 1. Fetch exactly 4 products
+        // Note: Assumes ProductService.getAllProducts is updated to handle pagination
+        const data = await ProductService.getAllProducts(currentPage, 4); 
+        
+        // 2. Add them to our list
+        tempProducts.push(...data.content);
+        setProducts([...tempProducts]);
+        setAllProducts([...tempProducts]);
+
+        // 3. Check if we are at the end
+        hasMore = !data.last;
+        currentPage++;
+
+        if (hasMore) {
+          // 4. Show loading symbol specifically for the next batch and wait 2 seconds
+          setIsFetchingBatch(true); 
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          setIsFetchingBatch(false);
+        }
+        // Initial loader only for the very first fetch
+        if (currentPage === 1) setLoading(false); 
+      }
     } catch (e) {
-      console.error("Fetch failed", e);
+      console.error("Staggered fetch failed", e);
     } finally {
       setLoading(false);
+      setIsFetchingBatch(false);
     }
   };
 
@@ -234,65 +262,75 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {products.map((product) => (
-            <Link
-              key={`${product.productId}-${product.variantId}`}
-              to={`/product/${product.productId}?variantId=${product.variantId}`}
-              className="block group h-full"
-            >
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative flex flex-col h-full">
-                {!product.inStock && (
-                  <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
-                    Out of Stock
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {products.map((product) => (
+              <Link
+                key={`${product.productId}-${product.variantId}`}
+                to={`/product/${product.productId}?variantId=${product.variantId}`}
+                className="block group h-full"
+              >
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative flex flex-col h-full">
+                  {!product.inStock && (
+                    <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
+                      Out of Stock
+                    </div>
+                  )}
+                  <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
+                    <img
+                      src={product.imageUrl || "https://via.placeholder.com/400x500"}
+                      alt={product.name}
+                      className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                    />
                   </div>
-                )}
-                <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
-                  <img
-                    src={product.imageUrl || "https://via.placeholder.com/400x500"}
-                    alt={product.name}
-                    className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-                <div className="p-4 flex flex-col flex-grow justify-between">
-                  <div>
-                    <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
-                      {product.brand}
-                    </span>
+                  <div className="p-4 flex flex-col flex-grow justify-between">
+                    <div>
+                      <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
+                        {product.brand}
+                      </span>
 
-                    {/* PROFESSIONALLY RENDER THE FIRST USP AS A TAG */}
-                    {product.usp && product.usp.length > 0 && (
-                      <div className="mt-1 mb-2">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-black bg-zinc-100 px-1.5 py-0.5 rounded">
-                          {product.usp[0]}
+                      {product.usp && product.usp.length > 0 && (
+                        <div className="mt-1 mb-2">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-black bg-zinc-100 px-1.5 py-0.5 rounded">
+                            {product.usp[0]}
+                          </span>
+                        </div>
+                      )}
+
+                      <h3 className="text-lg font-bold mt-1 leading-tight line-clamp-2">
+                        {product.name}
+                      </h3>
+                    </div>
+
+                    <div className="mt-4 pt-2 border-t border-gray-50">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xl font-bold">
+                          ${product.lowestPrice.toFixed(2)}
                         </span>
                       </div>
-                    )}
-
-                    <h3 className="text-lg font-bold mt-1 leading-tight line-clamp-2">
-                      {product.name}
-                    </h3>
-                  </div>
-
-                  <div className="mt-4 pt-2 border-t border-gray-50">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xl font-bold">
-                        ${product.lowestPrice.toFixed(2)}
-                      </span>
-                    </div>
-                    {/* Merchant Count Badge */}
-                    <div className="flex items-center gap-1.5 text-zinc-400">
-                      <Store size={12} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">
-                        {product.totalMerchants} {product.totalMerchants === 1 ? 'Seller' : 'Sellers'} available
-                      </span>
+                      <div className="flex items-center gap-1.5 text-zinc-400">
+                        <Store size={12} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                          {product.totalMerchants} {product.totalMerchants === 1 ? 'Seller' : 'Sellers'} available
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Staggered batch loading symbol */}
+          {isFetchingBatch && (
+            <div className="flex flex-col items-center justify-center py-10 gap-4 mt-8">
+              <Loader2 className="w-8 h-8 animate-spin text-black" />
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Loading next batch...
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

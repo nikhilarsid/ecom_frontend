@@ -15,6 +15,8 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// --- INTERFACES ---
+
 export interface ProductListItem {
   productId: number;
   name: string;
@@ -26,8 +28,18 @@ export interface ProductListItem {
   lowestPrice: number;
   totalMerchants: number;
   inStock: boolean;
-usp: string[];
+  usp: string[];
   variantId: string;
+}
+
+// Interface to match Spring Data Page structure
+export interface PagedProductResponse {
+  content: ProductListItem[];
+  last: boolean;
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
 }
 
 export interface ProductDetail {
@@ -60,10 +72,19 @@ export interface CreateProductPayload {
   imageUrls: string[];
 }
 
+// --- SERVICE CLASS ---
+
 class ProductService {
-  async getAllProducts(): Promise<ProductListItem[]> {
-    const response = await api.get("/products");
-    return response.data.data;
+  /**
+   * Returns the full PagedProductResponse.
+   * This allows Home.tsx to access 'data.content' and 'data.last'.
+   */
+  async getAllProducts(page: number = 0, size: number = 4): Promise<PagedProductResponse> {
+    const response = await api.get("/products", {
+      params: { page, size }
+    });
+    // Returns the Page object stored in the 'data' field of your ApiResponse
+    return response.data.data; 
   }
 
   async getMerchantListings(): Promise<ProductListItem[]> {
