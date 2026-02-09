@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, HardDrive, Palette, Loader2, X, Store } from "lucide-react";
+import { Search, HardDrive, Palette, Loader2, X, Store, ChevronDown, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProductService, { ProductListItem } from "../services/ProductService";
 
@@ -42,6 +42,21 @@ export default function Home() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+  const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // close mobile dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const el = mobileDropdownRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && !el.contains(e.target)) {
+        setMobileDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     fetchAllProducts(0);
@@ -248,9 +263,9 @@ export default function Home() {
             </div>
           )}
         </div>
-        {(searchTerm || selectedCategory) && (
+        {searchTerm && (
           <button
-            onClick={clearFilters}
+            onClick={() => { setSearchTerm(""); setSuggestions([]); setShowSuggestions(false); if (searchInputRef.current) searchInputRef.current.focus(); }}
             className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
           >
             <X size={18} />
@@ -259,14 +274,23 @@ export default function Home() {
         )}
       </div>
 
-      {/* Category Filter — pill chips with small-screen fallback */}
-      <div className="mb-6">
+      {/* Category Filter — visible as pillar chips on large screens */}
+      <div className="mb-6 hidden lg:block">
         <div className="flex items-center justify-between">
           <label className="text-sm font-black uppercase tracking-widest text-zinc-600 block">
             Filter by Category
           </label>
-          <div className="text-sm text-gray-500">
-            Choose a category to narrow results
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">Choose a category to narrow results</div>
+            {selectedCategory && (
+              <button
+                onClick={() => setSelectedCategory("")}
+                className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg font-semibold text-gray-700 transition"
+              >
+                <X size={14} />
+                <span className="ml-2">Clear</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -289,20 +313,66 @@ export default function Home() {
           ))}
         </div>
 
-        {/* keep a compact select for small screens / accessibility */}
-        <div className="mt-3 lg:hidden">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white font-semibold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all"
-          >
-            <option value="">All Categories</option>
-            {FILTER_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+        {/* mobile select removed intentionally to hide filter on small screens */}
+      </div>
+
+      {/* Compact mobile filter bar (small screens only) */}
+      <div className="mb-6 block lg:hidden">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm px-3 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div ref={mobileDropdownRef} className="relative w-full">
+              <button
+                onClick={() => setMobileDropdownOpen((s) => !s)}
+                className="w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-transparent"
+                aria-haspopup="listbox"
+                aria-expanded={mobileDropdownOpen}
+              >
+                <span className="truncate text-sm font-semibold text-gray-700">
+                  {selectedCategory || "All Categories"}
+                </span>
+                <ChevronDown size={16} className="text-gray-500" />
+              </button>
+
+              {mobileDropdownOpen && (
+                <div className="absolute left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-md max-h-60 overflow-y-auto">
+                  <button
+                    onClick={() => { setSelectedCategory(""); setMobileDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm font-semibold ${selectedCategory === "" ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>All Categories</span>
+                      {selectedCategory === "" && <Check size={14} className="text-black" />}
+                    </div>
+                  </button>
+                  {FILTER_CATEGORIES.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => { setSelectedCategory(category); setMobileDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm font-semibold ${selectedCategory === category ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">{category}</span>
+                        {selectedCategory === category && <Check size={14} className="text-black" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedCategory && (
+              <button
+                onClick={() => { setSelectedCategory(""); setMobileDropdownOpen(false); }}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold transition"
+                aria-label="Clear filters"
+              >
+                <X size={14} />
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
