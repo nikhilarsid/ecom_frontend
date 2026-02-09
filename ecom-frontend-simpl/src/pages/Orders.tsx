@@ -379,46 +379,49 @@ export default function Orders() {
     setExpandingId(orderId);
 
     try {
-      const res = await fetch(
-        `https://order-service-p792.onrender.com/api/orders/viewItem/${orderId}`,
-        { headers: getHeaders() }
-      );
-      const json = await res.json();
+      // 1. Get items from the existing order list in state
+      const targetOrder = orders.find((o) => String(o.orderId) === orderId);
+      let items = targetOrder?.items || [];
 
-      if (json.success) {
-        let items = json.data;
-        if (!Array.isArray(items)) {
-          items = items?.items ? items.items : (items ? [items] : []);
-        }
-
-        const hydratedItems = await Promise.all(
-          items.map(async (item: any) => {
-            const pid = item.productId || item.merchantProductId;
-            try {
-              if (pid) {
-                // Fetch from public endpoint (no auth headers)
-                const pRes = await fetch(
-                  `https://product-service-jzzf.onrender.com/api/v1/products/${pid}`
-                );
-                const pData = await pRes.json();
-                if (pData.success) {
-                  return {
-                    ...item,
-                    productName: pData.data.name,
-                    imageUrl: pData.data.imageUrls?.[0],
-                  };
-                }
-              }
-            } catch (e) {
-              console.warn("Image fetch failed", pid);
-            }
-            return item;
-          })
-        );
-
-        setOrderDetails((prev) => ({ ...prev, [orderId]: hydratedItems }));
-        setExpandedOrder(orderId);
+      if (!Array.isArray(items)) {
+        // @ts-ignore
+        items = items?.items ? items.items : items ? [items] : [];
       }
+
+      const hydratedItems = await Promise.all(
+        items.map(async (item: any) => {
+          // ✅ FIX: Use the Order Item Table ID (itemId), not Product ID
+          const itemId = item.itemId; 
+
+          try {
+            if (itemId) {
+              // ✅ FIX: Fetch from Order Service using the correct Item ID
+              const res = await fetch(
+                `https://order-service-p792.onrender.com/api/orders/viewItem/${itemId}`,
+                { headers: getHeaders() }
+              );
+              const json = await res.json();
+
+              if (json.success) {
+                return {
+                  ...item,
+                  // ✅ FIX: Map the data from Order Service response
+                  // Order Service returns 'imageUrl' directly as a string (from your DB table)
+                  imageUrl: json.data.imageUrl, 
+                  merchantName: json.data.merchantName,
+                  price: json.data.price
+                };
+              }
+            }
+          } catch (e) {
+            console.warn("Item details fetch failed", itemId);
+          }
+          return item;
+        })
+      );
+
+      setOrderDetails((prev) => ({ ...prev, [orderId]: hydratedItems }));
+      setExpandedOrder(orderId);
     } catch (e) {
       console.error("API Error", e);
     } finally {

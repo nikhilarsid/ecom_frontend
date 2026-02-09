@@ -241,42 +241,59 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {products.map((product) => (
             <Link
-  key={`${product.productId}-${product.variantId}`}
-  to={`/product/${product.productId}?variantId=${product.variantId}`}
-  className="block group h-full"
->
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative flex flex-col h-full">
-    {!product.inStock && (
-      <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
-        Out of Stock
-      </div>
-    )}
-    {/* Fixed Aspect Ratio Container */}
-    <div className="aspect-square bg-gray-50 overflow-hidden flex-shrink-0">
-      <img
-        src={product.imageUrl || "https://via.placeholder.com/400x500"}
-        alt={product.name}
-        className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
-      />
-    </div>
-    <div className="p-4 flex flex-col flex-grow justify-between">
-      <div>
-        <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
-          {product.brand}
-        </span>
-        <h3 className="text-lg font-bold mt-1 leading-tight line-clamp-2">
-          {product.name}
-        </h3>
-      </div>
+              key={`${product.productId}-${product.variantId}`}
+              to={`/product/${product.productId}?variantId=${product.variantId}`}
+              className="block group"
+            >
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative">
+                {!product.inStock && (
+                  <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide z-10">
+                    Out of Stock
+                  </div>
+                )}
+                <div className="aspect-[4/5] bg-gray-100 overflow-hidden">
+                  <img
+                    src={
+                      product.imageUrl || "https://via.placeholder.com/400x500"
+                    }
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="p-4">
+                  <span className="text-xs font-bold uppercase text-gray-400 tracking-wide">
+                    {product.brand}
+                  </span>
+                  <h3 className="text-lg font-bold mt-1 leading-tight">
+                    {product.name}
+                  </h3>
 
-      <div className="flex justify-between items-center mt-4 pt-2 border-t border-gray-50">
-        <span className="text-xl font-bold">
-          ${product.lowestPrice.toFixed(2)}
-        </span>
-      </div>
-    </div>
-  </div>
-</Link>
+                  {/* Attributes */}
+                  <div className="mt-2 mb-3 flex flex-wrap gap-2">
+                    {Object.entries(product.attributes).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md text-xs"
+                      >
+                        {getAttributeIcon(key)}
+                        <span className="font-medium">{key}:</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-xl font-bold">
+                      ${product.lowestPrice.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {product.totalMerchants} seller
+                      {product.totalMerchants !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       )}
