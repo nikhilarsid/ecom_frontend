@@ -159,7 +159,7 @@ export default function Checkout() {
       // If the backend returns 500 but also says "success: true" or if the order was created
       if (json.success || res.status === 200 || res.status === 201) {
         // Notification
-        fetch("https://ecommerce-notification-service-3vmg.onrender.com/api/notifications/send", {
+        fetch("https://ecommerce-notification-service-3vmg.onrender.com/api/notifications/email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
