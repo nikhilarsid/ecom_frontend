@@ -6,9 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import Layout from "./components/Layout";
-// Note: We keep the CSS import so styles work if the library is fixed
-import "react-toastify/dist/ReactToastify.css";
-
+import { Toaster } from "sonner"; // 👈 Using sonner for React 19 compatibility
 // Page Imports
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -50,10 +48,8 @@ const ProtectedRoute = ({
 function App() {
   return (
     <Router>
+      <Toaster position="top-center" />
       <Layout>
-        {/* REMOVED ToastContainer from here. 
-          React 19 currently has a conflict with the Lt component in react-toastify.
-        */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<IndividualProductDetails />} />

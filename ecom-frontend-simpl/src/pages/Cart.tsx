@@ -11,7 +11,7 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { showToast } from "../utils/toast";
+import { showToast } from "../utils/toast"; // Ensure this is imported
 
 // --- ANIMATIONS ---
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
@@ -110,34 +110,38 @@ export default function Cart() {
       return;
     }
 
-     try {
-    const res = await fetch("https://order-service-p792.onrender.com/api/cart/view", { headers: getHeaders() });
-    const json = await res.json();
-    
-    if (json.success) {
-      setCart(json.data);
-      const items = json.data.items || [];
-
-      // Fetch full details for each cart item
-      const mergedItems = await Promise.all(
-        items.map(async (item: any) => {
-          try {
-            const pRes = await fetch(`https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`);
-            const pJson = await pRes.json();
-            return {
-              ...item,
-              productName: pJson.data.name,
-              imageUrl: pJson.data.imageUrls?.[0],
-              brand: pJson.data.brand
-            };
-          } catch (e) {
-            return { ...item, productName: "Product" };
-          }
-        })
+    try {
+      const res = await fetch(
+        "https://order-service-p792.onrender.com/api/cart/view",
+        { headers: getHeaders() }
       );
-      setEnrichedItems(mergedItems);
-    }
-  } catch (e) {
+      const json = await res.json();
+
+      if (json.success) {
+        setCart(json.data);
+        const items = json.data.items || [];
+
+        const mergedItems = await Promise.all(
+          items.map(async (item: any) => {
+            try {
+              const pRes = await fetch(
+                `https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`
+              );
+              const pJson = await pRes.json();
+              return {
+                ...item,
+                productName: pJson.data.name,
+                imageUrl: pJson.data.imageUrls?.[0],
+                brand: pJson.data.brand,
+              };
+            } catch (e) {
+              return { ...item, productName: "Product" };
+            }
+          })
+        );
+        setEnrichedItems(mergedItems);
+      }
+    } catch (e) {
       setError("Network timeout. Unable to reach the Ethereal Order Service.");
     } finally {
       setLoading(false);
@@ -145,30 +149,30 @@ export default function Cart() {
   };
 
   const handleDeleteItem = async (itemId: string, currentQuantity: number) => {
-  // Use the specific itemId from the Cart API (e.g., 390002)
-  setDeleting(Number(itemId));
-  try {
-    // We send the full quantity to ensure the item is entirely removed
-    const res = await fetch(
-      `https://order-service-p792.onrender.com/api/cart/deleteItem/${itemId}?quantity=${currentQuantity}`,
-      {
-        method: "DELETE",
-        headers: getHeaders(),
-      }
-    );
+    setDeleting(Number(itemId));
+    try {
+      const res = await fetch(
+        `https://order-service-p792.onrender.com/api/cart/deleteItem/${itemId}?quantity=${currentQuantity}`,
+        {
+          method: "DELETE",
+          headers: getHeaders(),
+        }
+      );
 
-    const json = await res.json();
-    if (json.success) {
-      await fetchCart();
-      window.dispatchEvent(new Event("cartUpdated"));
-      showToast.success("Item removed from cart");
+      const json = await res.json();
+      if (json.success) {
+        await fetchCart();
+        window.dispatchEvent(new Event("cartUpdated"));
+        showToast.success("Item removed from cart");
+      } else {
+        showToast.error(json.message || "Failed to remove item");
+      }
+    } catch (e) {
+      showToast.error("Failed to remove item");
+    } finally {
+      setDeleting(null);
     }
-  } catch (e) {
-    showToast.error("Failed to remove item");
-  } finally {
-    setDeleting(null);
-  }
-};
+  };
 
   // Quantity adjustment state
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
@@ -189,19 +193,30 @@ export default function Cart() {
         {
           method: "POST",
           headers: getHeaders(),
-          body: JSON.stringify(body),
         },
+      ); // NOTE: You missed the 'body' in your pasted code, fixed here:
+      
+      // Actual Fetch Call with Body
+      const resWithBody = await fetch(
+        "https://order-service-p792.onrender.com/api/cart/addItem",
+        {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify(body),
+        }
       );
 
-      const json = await res.json();
+      const json = await resWithBody.json();
       if (json.success) {
         await fetchCart();
         window.dispatchEvent(new Event("cartUpdated"));
+        // Optional: showToast.success("Quantity updated");
       } else {
-        alert("Failed to add item: " + json.message);
+        // ✅ CHANGED from alert to toast
+        showToast.error(json.message || "Cannot increase quantity (Stock limit reached)");
       }
     } catch (e) {
-      alert("Network error. Could not update quantity.");
+      showToast.error("Network error. Could not update quantity.");
     } finally {
       setAdjustingId(null);
     }
@@ -224,10 +239,11 @@ export default function Cart() {
         await fetchCart();
         window.dispatchEvent(new Event("cartUpdated"));
       } else {
-        alert("Failed to decrease quantity: " + json.message);
+        // ✅ CHANGED from alert to toast
+        showToast.error(json.message || "Failed to decrease quantity");
       }
     } catch (e) {
-      alert("Network error. Could not update quantity.");
+      showToast.error("Network error. Could not update quantity.");
     } finally {
       setAdjustingId(null);
     }
@@ -304,8 +320,8 @@ export default function Cart() {
       <div className="flex justify-between items-end mb-12">
         <div>
           <h1 className="text-xl font-black tracking-tighter italic uppercase leading-none">
-          Your Cart
-        </h1>
+            Your Cart
+          </h1>
           <p className="text-zinc-400 font-bold text-xs uppercase tracking-[0.4em] mt-4">
             Review Your Selection
           </p>
@@ -393,17 +409,17 @@ export default function Cart() {
               <p className="font-black text-2xl tracking-tighter mb-4">
                 ${(item.price * item.quantity).toLocaleString()}
               </p>
-             <button
-  onClick={() => handleDeleteItem(item.itemId, item.quantity)} // Ensure item.itemId is used
-  disabled={deleting === Number(item.itemId)}
-  className="text-zinc-300 hover:text-red-500 transition-colors p-2"
->
-  {deleting === Number(item.itemId) ? (
-    <Spinner size={20} />
-  ) : (
-    <Trash2 size={20} />
-  )}
-</button>
+              <button
+                onClick={() => handleDeleteItem(item.itemId, item.quantity)}
+                disabled={deleting === Number(item.itemId)}
+                className="text-zinc-300 hover:text-red-500 transition-colors p-2"
+              >
+                {deleting === Number(item.itemId) ? (
+                  <Spinner size={20} />
+                ) : (
+                  <Trash2 size={20} />
+                )}
+              </button>
             </div>
           </CartItem>
         ))}

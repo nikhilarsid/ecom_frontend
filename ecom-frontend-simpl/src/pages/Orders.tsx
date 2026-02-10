@@ -12,7 +12,7 @@ import {
   MapPin,
   Calendar,
   X,
-  ImageOff // Import ImageOff icon
+  ImageOff, // Import ImageOff icon
 } from "lucide-react";
 
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
@@ -121,7 +121,7 @@ const MiniProduct = styled.div`
     object-fit: cover;
     mix-blend-mode: multiply;
   }
-  
+
   .placeholder-thumb {
     width: 48px;
     height: 48px;
@@ -344,7 +344,7 @@ export default function Orders() {
     try {
       const res = await fetch(
         "https://order-service-p792.onrender.com/api/orders/view",
-        { headers: getHeaders() }
+        { headers: getHeaders() },
       );
 
       if (res.status === 403) {
@@ -391,14 +391,14 @@ export default function Orders() {
       const hydratedItems = await Promise.all(
         items.map(async (item: any) => {
           // ✅ FIX: Use the Order Item Table ID (itemId), not Product ID
-          const itemId = item.itemId; 
+          const itemId = item.itemId;
 
           try {
             if (itemId) {
               // ✅ FIX: Fetch from Order Service using the correct Item ID
               const res = await fetch(
                 `https://order-service-p792.onrender.com/api/orders/viewItem/${itemId}`,
-                { headers: getHeaders() }
+                { headers: getHeaders() },
               );
               const json = await res.json();
 
@@ -407,9 +407,15 @@ export default function Orders() {
                   ...item,
                   // ✅ FIX: Map the data from Order Service response
                   // Order Service returns 'imageUrl' directly as a string (from your DB table)
-                  imageUrl: json.data.imageUrl, 
+                  imageUrl: json.data.imageUrl,
                   merchantName: json.data.merchantName,
-                  price: json.data.price
+                  price: json.data.price,
+                  // Ensure productName is available for display in modal/list
+                  productName:
+                    json.data.productName ||
+                    json.data.name ||
+                    item.productName ||
+                    item.name,
                 };
               }
             }
@@ -417,7 +423,7 @@ export default function Orders() {
             console.warn("Item details fetch failed", itemId);
           }
           return item;
-        })
+        }),
       );
 
       setOrderDetails((prev) => ({ ...prev, [orderId]: hydratedItems }));
@@ -470,7 +476,8 @@ export default function Orders() {
         stage: "Delivered",
         description: "Package delivered to your address",
         completed: false,
-        date: "Expected: " + new Date(Date.now() + 432000000).toLocaleDateString(),
+        date:
+          "Expected: " + new Date(Date.now() + 432000000).toLocaleDateString(),
       },
     ];
   };
@@ -486,28 +493,28 @@ export default function Orders() {
   };
 
   // ✅ ERROR SAFE IMAGE COMPONENT
-  const SafeImage = ({ src, alt }: { src?: string, alt: string }) => {
+  const SafeImage = ({ src, alt }: { src?: string; alt: string }) => {
     const [hasError, setHasError] = useState(false);
 
     if (!src || hasError) {
-        return (
-            <div className="placeholder-thumb">
-                <ImageOff size={16} />
-            </div>
-        );
+      return (
+        <div className="placeholder-thumb">
+          <ImageOff size={16} />
+        </div>
+      );
     }
 
     return (
-        <img
-            src={src}
-            alt={alt}
-            className="product-thumb"
-            onError={(e) => {
-                // Prevent infinite loop by setting error state and clearing handler
-                e.currentTarget.onerror = null;
-                setHasError(true);
-            }}
-        />
+      <img
+        src={src}
+        alt={alt}
+        className="product-thumb"
+        onError={(e) => {
+          // Prevent infinite loop by setting error state and clearing handler
+          e.currentTarget.onerror = null;
+          setHasError(true);
+        }}
+      />
     );
   };
 
@@ -605,8 +612,11 @@ export default function Orders() {
                         }}
                       >
                         {/* ✅ Use Safe Image Component */}
-                        <SafeImage src={item.imageUrl} alt={item.productName || "Product"} />
-                        
+                        <SafeImage
+                          src={item.imageUrl}
+                          alt={item.productName || "Product"}
+                        />
+
                         <div className="info">
                           <span className="text-[10px] font-bold text-zinc-900 leading-tight">
                             {item.productName || "Product"}
@@ -642,10 +652,21 @@ export default function Orders() {
             <ItemDetailsContainer>
               <ItemHeader>
                 {/* Safe Image for Modal Header */}
-                <div style={{ width: 150, height: 150, borderRadius: 20, overflow: 'hidden', flexShrink: 0 }}>
-                    <SafeImage src={selectedItem.imageUrl} alt={selectedItem.productName} />
+                <div
+                  style={{
+                    width: 150,
+                    height: 150,
+                    borderRadius: 20,
+                    overflow: "hidden",
+                    flexShrink: 0,
+                  }}
+                >
+                  <SafeImage
+                    src={selectedItem.imageUrl}
+                    alt={selectedItem.productName}
+                  />
                 </div>
-                
+
                 <ItemInfo>
                   <ItemTitle>{selectedItem.productName || "Product"}</ItemTitle>
                   <ItemMeta>
@@ -657,7 +678,6 @@ export default function Orders() {
                       <span className="font-bold">Price:</span> $
                       {selectedItem.price}
                     </MetaItem>
-                    
                   </ItemMeta>
                 </ItemInfo>
               </ItemHeader>
