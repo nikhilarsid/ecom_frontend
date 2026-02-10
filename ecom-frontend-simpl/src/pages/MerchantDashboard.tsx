@@ -17,6 +17,7 @@ interface InventoryItem extends ProductListItem {
   newPrice?: number;
   newStock?: number;
   // Ensure these match what the service provides
+  usp?: string[];
   specs?: Record<string, string>;
   attributes?: Record<string, string>;
 }
@@ -38,6 +39,7 @@ export default function MerchantDashboard() {
     brand: "",
     description: "",
     categories: [""],
+    usp: [""], 
     specs: {},
     attributes: {},
     price: 0,
@@ -73,9 +75,11 @@ export default function MerchantDashboard() {
       brand: "",
       description: "",
       categories: [""],
+      usp: [""], 
       specs: {},
       attributes: {},
       price: 0,
+
       quantity: 0,
       imageUrls: [""],
     });
@@ -106,6 +110,7 @@ export default function MerchantDashboard() {
       categories: product.categories || [""],
       specs: product.specs || {},
       attributes: product.attributes || {},
+      usp: product.usp || [""],
       price: product.lowestPrice,
       quantity: product.totalMerchants, // Using totalMerchants as Stock count based on service logic
       imageUrls: product.imageUrl ? [product.imageUrl] : [""],
@@ -293,6 +298,50 @@ export default function MerchantDashboard() {
             className="w-full border border-zinc-200 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-black transition-colors"
             rows={3}
           />
+
+          {/* USP Section */}
+<div className="mb-6">
+  <label className="block font-black text-sm uppercase tracking-widest text-zinc-600 mb-3">
+    Unique Selling Points (USP)
+  </label>
+  {formData.usp.map((point, index) => (
+    <div key={index} className="flex gap-2 mb-2">
+      <input
+        type="text"
+        placeholder="e.g. 24-hour battery life"
+        value={point}
+        onChange={(e) => {
+          const newUsps = [...formData.usp];
+          newUsps[index] = e.target.value;
+          setFormData({ ...formData, usp: newUsps });
+        }}
+        className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
+      />
+      <button
+        onClick={() =>
+          setFormData({
+            ...formData,
+            usp: formData.usp.filter((_, i) => i !== index),
+          })
+        }
+        className="text-red-500 font-semibold hover:text-red-700"
+      >
+        Remove
+      </button>
+    </div>
+  ))}
+  <button
+    onClick={() =>
+      setFormData({
+        ...formData,
+        usp: [...formData.usp, ""],
+      })
+    }
+    className="text-blue-600 font-semibold hover:text-blue-800 text-sm"
+  >
+    + Add USP
+  </button>
+</div>
 
           {/* Categories */}
           <div className="mb-6">

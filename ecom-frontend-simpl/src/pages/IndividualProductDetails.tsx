@@ -434,10 +434,7 @@ export default function IndividualProductDetails() {
           </div>
 
           <div className="flex items-center gap-4 mb-10">
-            <div className="flex bg-black text-white px-3 py-1 rounded-full items-center gap-1.5">
-              <Star size={12} fill="white" />
-              <span className="text-xs font-black">4.8</span>
-            </div>
+            
             <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">
               {reviews.length} Verified Reviews
             </span>
