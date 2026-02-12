@@ -1,0 +1,21 @@
+{
+  "name": "ethereal-automation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jest.config.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+  "test": "jest"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "chromedriver": "^145.0.1",
+    "jest": "^30.2.0",
+    "selenium-webdriver": "^4.40.0"
+  }
+}

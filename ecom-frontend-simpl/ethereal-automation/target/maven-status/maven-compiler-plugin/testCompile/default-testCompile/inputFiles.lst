@@ -1,0 +1,17 @@
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/base/BaseTest.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/AuthModal.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/BasePage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/CartPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/CheckoutPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/HomePage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/IndividualProductDetailsPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/LoginPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/MerchantDashboardPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/MerchantHomePage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/MerchantManagePage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/NavComponent.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/OrdersPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/ProductDetailsPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/pages/RegisterPage.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/tests/MerchantFlowTest.java
+/Users/shrihithapulapa/Ecom-Frontend-simplified/ecom_frontend/ecom-frontend-simpl/ethereal-automation/src/test/java/tests/UserFlowTest.java
