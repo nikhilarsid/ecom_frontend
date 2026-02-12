@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import styled from "styled-components";
+import emailjs from "@emailjs/browser"; // ✅ Imported EmailJS
 import {
   ShieldCheck,
   Truck,
@@ -96,6 +97,11 @@ const SummaryItem = styled.div`
   img { width: 60px; height: 60px; object-fit: contain; border-radius: 12px; background: white; padding: 4px; }
 `;
 
+// --- EMAILJS CONFIGURATION ---
+const EMAILJS_SERVICE_ID = "service_olg21u3";
+const EMAILJS_TEMPLATE_ID = "template_gcy6mwo";
+const EMAILJS_PUBLIC_KEY = "UEWIZ-hGeB-5N8eNF";
+
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -139,11 +145,29 @@ export default function Checkout() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ Helper to send email via EmailJS
+  // ✅ UPDATE THIS FUNCTION
+  const sendConfirmationEmail = (orderId, totalAmount) => {
+    const templateParams = {
+      customer_name: `${formData.firstName} ${formData.lastName}`,
+      to_email: localStorage.getItem("userName"),
+      order_id: orderId,         // ✅ NEW: Sending Order ID
+      total_amount: totalAmount, // ✅ NEW: Sending Total Amount
+    };
+
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY)
+      .then((response) => {
+        console.log('✅ Email sent successfully!', response.status, response.text);
+      })
+      .catch((err) => {
+        console.error('❌ Failed to send email:', err);
+      });
+  };
+
   const handlePlaceOrder = async () => {
     if (!validate()) { showToast.error("Fix form errors"); return; }
     setIsProcessing(true);
     const token = localStorage.getItem("token");
-    const userEmail = localStorage.getItem("userName");
 
     try {
       // Placing order. 
@@ -158,18 +182,11 @@ export default function Checkout() {
 
       // If the backend returns 500 but also says "success: true" or if the order was created
       if (json.success || res.status === 200 || res.status === 201) {
-        // Notification
-        fetch("https://ecommerce-notification-service-3vmg.onrender.com/api/notifications/email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipient: userEmail,
-            message: `Order #${json.data || 'Success'} placed!`,
-            type: "ORDER_SUCCESS"
-          })
-        }).catch(() => {});
+        
+        // ✅ UPDATE THIS LINE to pass the data
+        sendConfirmationEmail(json.data || "Pending", cart.totalValue);
 
-        showToast.success("Order Placed Successfully!");
+        showToast.success("Order Placed Successfully! Please check your email for confirmation.");
         window.dispatchEvent(new Event("cartUpdated"));
         navigate("/orders");
       } else {

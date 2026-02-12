@@ -39,7 +39,7 @@ export default function MerchantDashboard() {
     brand: "",
     description: "",
     categories: [""],
-    usp: [""], 
+    usp: [""],
     specs: {},
     attributes: {},
     price: 0,
@@ -75,7 +75,7 @@ export default function MerchantDashboard() {
       brand: "",
       description: "",
       categories: [""],
-      usp: [""], 
+      usp: [""],
       specs: {},
       attributes: {},
       price: 0,
@@ -98,9 +98,7 @@ export default function MerchantDashboard() {
     const sVals = product.specs ? Object.values(product.specs) : [""];
 
     const aKeys = product.attributes ? Object.keys(product.attributes) : [""];
-    const aVals = product.attributes
-      ? Object.values(product.attributes)
-      : [""];
+    const aVals = product.attributes ? Object.values(product.attributes) : [""];
 
     // Populate Form Data
     setFormData({
@@ -134,6 +132,65 @@ export default function MerchantDashboard() {
 
   // 🆕 UPDATED: Handles both Add and Relist (Delete + Add)
   const handleSaveProduct = async () => {
+    // Validate mandatory fields and size limits
+    const errors: string[] = [];
+
+    const name = formData.name ? formData.name.trim() : "";
+    if (!name) errors.push("Product name is required.");
+    else if (name.length > 150)
+      errors.push("Product name must be at most 150 characters.");
+
+    if (typeof formData.price !== "number" || formData.price <= 0)
+      errors.push("Price must be greater than 0.");
+    else if (formData.price > 1000000)
+      errors.push("Price must be less than or equal to 1,000,000.");
+
+    if (!Number.isInteger(formData.quantity) || formData.quantity <= 0)
+      errors.push("Quantity must be a positive integer.");
+    else if (formData.quantity > 100000)
+      errors.push("Quantity must be less than or equal to 100000.");
+
+    if (formData.brand && formData.brand.length > 50)
+      errors.push("Brand must be at most 50 characters.");
+    if (formData.description && formData.description.length > 2000)
+      errors.push("Description must be at most 2000 characters.");
+
+    formData.usp.forEach((u, i) => {
+      if (u && u.length > 200)
+        errors.push(`USP #${i + 1} must be at most 200 characters.`);
+    });
+    formData.categories.forEach((c, i) => {
+      if (c && c.length > 100)
+        errors.push(`Category #${i + 1} must be at most 100 characters.`);
+    });
+
+    specKeys.forEach((k, i) => {
+      const v = specValues[i];
+      if (k && k.length > 100)
+        errors.push(`Spec key #${i + 1} must be at most 100 characters.`);
+      if (v && v.length > 200)
+        errors.push(`Spec value #${i + 1} must be at most 200 characters.`);
+    });
+    attrKeys.forEach((k, i) => {
+      const v = attrValues[i];
+      if (k && k.length > 100)
+        errors.push(`Attribute key #${i + 1} must be at most 100 characters.`);
+      if (v && v.length > 200)
+        errors.push(
+          `Attribute value #${i + 1} must be at most 200 characters.`,
+        );
+    });
+
+    formData.imageUrls.forEach((url, i) => {
+      if (url && url.length > 2000)
+        errors.push(`Image URL #${i + 1} is too long.`);
+    });
+
+    if (errors.length) {
+      alert(errors.join("\n"));
+      return;
+    }
+
     try {
       // Build specs/attributes maps
       const specs: Record<string, string> = {};
@@ -159,7 +216,7 @@ export default function MerchantDashboard() {
         console.log("Relisting: Deleting old variant...");
         await ProductService.deleteInventory(
           editingId.id.toString(),
-          editingId.variantId
+          editingId.variantId,
         );
       }
 
@@ -170,7 +227,7 @@ export default function MerchantDashboard() {
       alert(
         editingId
           ? "Product details updated successfully!"
-          : "Product added successfully!"
+          : "Product added successfully!",
       );
 
       resetForm();
@@ -277,6 +334,7 @@ export default function MerchantDashboard() {
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
+              maxLength={150}
               className="border border-zinc-200 rounded-lg px-4 py-3 focus:outline-none focus:border-black transition-colors"
             />
             <input
@@ -286,6 +344,7 @@ export default function MerchantDashboard() {
               onChange={(e) =>
                 setFormData({ ...formData, brand: e.target.value })
               }
+              maxLength={50}
               className="border border-zinc-200 rounded-lg px-4 py-3 focus:outline-none focus:border-black transition-colors"
             />
           </div>
@@ -295,53 +354,55 @@ export default function MerchantDashboard() {
             onChange={(e) =>
               setFormData({ ...formData, description: e.target.value })
             }
+            maxLength={2000}
             className="w-full border border-zinc-200 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-black transition-colors"
             rows={3}
           />
 
           {/* USP Section */}
-<div className="mb-6">
-  <label className="block font-black text-sm uppercase tracking-widest text-zinc-600 mb-3">
-    Unique Selling Points (USP)
-  </label>
-  {formData.usp.map((point, index) => (
-    <div key={index} className="flex gap-2 mb-2">
-      <input
-        type="text"
-        placeholder="e.g. 24-hour battery life"
-        value={point}
-        onChange={(e) => {
-          const newUsps = [...formData.usp];
-          newUsps[index] = e.target.value;
-          setFormData({ ...formData, usp: newUsps });
-        }}
-        className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
-      />
-      <button
-        onClick={() =>
-          setFormData({
-            ...formData,
-            usp: formData.usp.filter((_, i) => i !== index),
-          })
-        }
-        className="text-red-500 font-semibold hover:text-red-700"
-      >
-        Remove
-      </button>
-    </div>
-  ))}
-  <button
-    onClick={() =>
-      setFormData({
-        ...formData,
-        usp: [...formData.usp, ""],
-      })
-    }
-    className="text-blue-600 font-semibold hover:text-blue-800 text-sm"
-  >
-    + Add USP
-  </button>
-</div>
+          <div className="mb-6">
+            <label className="block font-black text-sm uppercase tracking-widest text-zinc-600 mb-3">
+              Unique Selling Points (USP)
+            </label>
+            {formData.usp.map((point, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 24-hour battery life"
+                  value={point}
+                  onChange={(e) => {
+                    const newUsps = [...formData.usp];
+                    newUsps[index] = e.target.value;
+                    setFormData({ ...formData, usp: newUsps });
+                  }}
+                  maxLength={200}
+                  className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
+                />
+                <button
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      usp: formData.usp.filter((_, i) => i !== index),
+                    })
+                  }
+                  className="text-red-500 font-semibold hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() =>
+                setFormData({
+                  ...formData,
+                  usp: [...formData.usp, ""],
+                })
+              }
+              className="text-blue-600 font-semibold hover:text-blue-800 text-sm"
+            >
+              + Add USP
+            </button>
+          </div>
 
           {/* Categories */}
           <div className="mb-6">
@@ -359,6 +420,7 @@ export default function MerchantDashboard() {
                     newCats[index] = e.target.value;
                     setFormData({ ...formData, categories: newCats });
                   }}
+                  maxLength={100}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <button
@@ -405,6 +467,7 @@ export default function MerchantDashboard() {
                     newKeys[index] = e.target.value;
                     setSpecKeys(newKeys);
                   }}
+                  maxLength={100}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <input
@@ -416,6 +479,7 @@ export default function MerchantDashboard() {
                     newValues[index] = e.target.value;
                     setSpecValues(newValues);
                   }}
+                  maxLength={200}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <button
@@ -456,6 +520,7 @@ export default function MerchantDashboard() {
                     newKeys[index] = e.target.value;
                     setAttrKeys(newKeys);
                   }}
+                  maxLength={100}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <input
@@ -467,6 +532,7 @@ export default function MerchantDashboard() {
                     newValues[index] = e.target.value;
                     setAttrValues(newValues);
                   }}
+                  maxLength={200}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <button
@@ -496,6 +562,9 @@ export default function MerchantDashboard() {
               type="number"
               placeholder="Price"
               value={formData.price || ""}
+              min={0.01}
+              max={1000000}
+              step="0.01"
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -508,6 +577,9 @@ export default function MerchantDashboard() {
               type="number"
               placeholder="Quantity"
               value={formData.quantity || ""}
+              min={1}
+              max={100000}
+              step={1}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -534,6 +606,7 @@ export default function MerchantDashboard() {
                     newUrls[index] = e.target.value;
                     setFormData({ ...formData, imageUrls: newUrls });
                   }}
+                  maxLength={2000}
                   className="flex-1 border border-zinc-200 rounded-lg px-4 py-2 focus:outline-none focus:border-black transition-colors"
                 />
                 <button

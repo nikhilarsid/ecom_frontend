@@ -120,8 +120,15 @@ export default function IndividualProductDetails() {
       if (pRes.ok) {
         const json = await pRes.json();
         setProduct(json.data);
-        if (json.data.sellers?.length > 0)
-          setSelectedMerchantForReview(json.data.sellers[0].merchantId);
+
+        // Auto-select first merchant with stock, otherwise select first available
+        if (json.data.sellers?.length > 0) {
+          const merchantWithStock = json.data.sellers.find(
+            (s: any) => s.stock > 0,
+          );
+          const defaultMerchant = merchantWithStock || json.data.sellers[0];
+          setSelectedMerchantForReview(defaultMerchant.merchantId);
+        }
       }
     } catch (e) {
       console.error("Product fetch failed", e);
@@ -292,7 +299,7 @@ export default function IndividualProductDetails() {
         targetSeller.merchantName?.split("@")[0] ||
         targetSeller.firstName ||
         "This seller";
-      const message = `${merchantName} only has ${targetSeller.stock} item(s) available. Please adjust your quantity.`;
+      const message = `You selected ${quantity} item(s) but ${merchantName} only has ${targetSeller.stock} item(s) in stock. Please reduce your quantity to ${targetSeller.stock} or less.`;
       showToast.error(message);
       return;
     }
@@ -434,7 +441,6 @@ export default function IndividualProductDetails() {
           </div>
 
           <div className="flex items-center gap-4 mb-10">
-            
             <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">
               {reviews.length} Verified Reviews
             </span>
@@ -449,41 +455,73 @@ export default function IndividualProductDetails() {
               Available From Merchants
             </h3>
             <ScrollContainer>
-              {product.sellers?.map((seller: any) => (
-                <div
-                  key={seller.merchantId}
-                  className={`flex-shrink-0 w-[280px] p-6 rounded-3xl border-2 transition-all cursor-pointer ${selectedMerchantForReview === seller.merchantId ? "border-black bg-white shadow-xl" : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-white"}`}
-                  onClick={() =>
-                    setSelectedMerchantForReview(seller.merchantId)
-                  }
-                >
-                  <div className="flex flex-col mb-4">
-                    <span className="font-black text-sm uppercase tracking-tight">
-                      {seller.merchantName?.split("@")[0] ||
-                        seller.firstName ||
-                        seller.lastName ||
-                        "Independent Seller"}
-                    </span>
-                    <span className="text-zinc-400 text-[10px] font-bold">
-                      Available: {seller.stock} units
-                    </span>
+              {product.sellers?.map((seller: any) => {
+                const isOutOfStock = seller.stock === 0;
+                const isSelected =
+                  selectedMerchantForReview === seller.merchantId;
+
+                return (
+                  <div
+                    key={seller.merchantId}
+                    className={`flex-shrink-0 w-[280px] p-6 rounded-3xl border-2 transition-all ${
+                      isOutOfStock
+                        ? "border-zinc-200 bg-zinc-100 cursor-not-allowed opacity-60"
+                        : isSelected
+                          ? "border-black bg-white shadow-xl cursor-pointer"
+                          : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-white cursor-pointer"
+                    }`}
+                    onClick={() => {
+                      if (!isOutOfStock) {
+                        setSelectedMerchantForReview(seller.merchantId);
+                      }
+                    }}
+                    style={{
+                      cursor: isOutOfStock ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <div className="flex flex-col mb-4">
+                      <span
+                        className={`font-black text-sm uppercase tracking-tight ${isOutOfStock ? "text-zinc-400" : ""}`}
+                      >
+                        {seller.merchantName?.split("@")[0] ||
+                          seller.firstName ||
+                          seller.lastName ||
+                          "Independent Seller"}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold ${isOutOfStock ? "text-red-500" : "text-zinc-400"}`}
+                      >
+                        {isOutOfStock
+                          ? "Out of Stock"
+                          : `Available: ${seller.stock} units`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`font-black text-2xl ${isOutOfStock ? "text-zinc-400" : ""}`}
+                      >
+                        ${seller.price.toFixed(2)}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isOutOfStock) {
+                            handleAddToCart(seller.merchantId);
+                          }
+                        }}
+                        disabled={isOutOfStock}
+                        className={`px-5 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-colors ${
+                          isOutOfStock
+                            ? "bg-zinc-300 text-zinc-500 cursor-not-allowed"
+                            : "bg-black text-white hover:bg-zinc-800"
+                        }`}
+                      >
+                        {isOutOfStock ? "Out" : "Pick This"}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-black text-2xl">
-                      ${seller.price.toFixed(2)}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddToCart(seller.merchantId);
-                      }}
-                      className="bg-black text-white px-5 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-zinc-800 transition-colors"
-                    >
-                      Pick This
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </ScrollContainer>
           </div>
 
@@ -514,7 +552,7 @@ export default function IndividualProductDetails() {
                 </button>
               </div>
               <button
-                onClick={() => handleAddToCart()}
+                onClick={() => handleAddToCart(selectedMerchantForReview)}
                 disabled={isAdding}
                 className="flex-1 bg-black text-white h-16 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[0.98] transition-all disabled:opacity-50"
               >

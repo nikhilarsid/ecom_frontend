@@ -9,7 +9,7 @@ import {
   ChevronDown,
   Check,
   Cpu,
-  Layers
+  Layers,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import ProductService, { ProductListItem } from "../services/ProductService";
@@ -31,9 +31,12 @@ const FILTER_CATEGORIES = [
 // Enhanced Icon Logic
 const getAttributeIcon = (key: string) => {
   const k = key.toLowerCase();
-  if (k.includes("storage") || k.includes("memory")) return <HardDrive size={14} className="text-zinc-900" />;
-  if (k.includes("color") || k.includes("colour")) return <Palette size={14} className="text-zinc-900" />;
-  if (k.includes("processor") || k.includes("cpu")) return <Cpu size={14} className="text-zinc-900" />;
+  if (k.includes("storage") || k.includes("memory"))
+    return <HardDrive size={14} className="text-zinc-900" />;
+  if (k.includes("color") || k.includes("colour"))
+    return <Palette size={14} className="text-zinc-900" />;
+  if (k.includes("processor") || k.includes("cpu"))
+    return <Cpu size={14} className="text-zinc-900" />;
   return <Layers size={14} className="text-zinc-900" />;
 };
 
@@ -185,8 +188,12 @@ export default function Home() {
     if (searchTerm.trim()) {
       try {
         setLoading(true);
-        const searchResults = await ProductService.searchProducts(searchTerm.trim());
-        const validResults = (searchResults || []).filter((p: any) => p !== null);
+        const searchResults = await ProductService.searchProducts(
+          searchTerm.trim(),
+        );
+        const validResults = (searchResults || []).filter(
+          (p: any) => p !== null,
+        );
         const final = selectedCategory
           ? validResults.filter((p) => p.categories?.includes(selectedCategory))
           : validResults;
@@ -199,7 +206,9 @@ export default function Home() {
             p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
         );
         if (selectedCategory) {
-          filtered = filtered.filter((p) => p.categories?.includes(selectedCategory));
+          filtered = filtered.filter((p) =>
+            p.categories?.includes(selectedCategory),
+          );
         }
         setProducts(filtered);
       } finally {
@@ -211,11 +220,17 @@ export default function Home() {
     if (selectedCategory) {
       try {
         setLoading(true);
-        const data = await ProductService.getAllProducts(0, 100, selectedCategory.toLowerCase());
+        const data = await ProductService.getAllProducts(
+          0,
+          100,
+          selectedCategory.toLowerCase(),
+        );
         const validResults = data.content.filter((p: any) => p !== null);
         setProducts(validResults);
       } catch (e) {
-        const filtered = allProducts.filter((p) => p.categories?.includes(selectedCategory));
+        const filtered = allProducts.filter((p) =>
+          p.categories?.includes(selectedCategory),
+        );
         setProducts(filtered);
       } finally {
         setLoading(false);
@@ -230,33 +245,55 @@ export default function Home() {
     .reduce((acc, product) => acc + (product.totalMerchants || 0), 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
       {/* Search Bar & Filters Section (Unchanged) */}
-      <div className="flex gap-4 mb-8 items-center">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6 sm:mb-8 items-stretch sm:items-center">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Search
+            size={18}
+            className="absolute left-4 sm:left-5 top-1/2 transform -translate-y-1/2 text-gray-400"
+          />
           <input
             ref={searchInputRef}
-            className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-lg border border-gray-200 focus:bg-white focus:border-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+            className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-gray-100 rounded-lg border border-gray-200 focus:bg-white focus:border-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-sm sm:text-base"
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") setShowSuggestions(false); }}
-            onFocus={() => searchTerm && suggestions.length > 0 && setShowSuggestions(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setShowSuggestions(false);
+            }}
+            onFocus={() =>
+              searchTerm && suggestions.length > 0 && setShowSuggestions(true)
+            }
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+            <div
+              ref={suggestionsRef}
+              className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto"
+            >
               {suggestions.map((suggestion) => (
                 <button
                   key={`${suggestion.productId}-${suggestion.variantId}`}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors text-left"
+                  className="w-full flex items-center gap-3 p-2 sm:p-3 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 transition-colors text-left"
                 >
-                  <img src={suggestion.imageUrl || "https://via.placeholder.com/50"} alt={suggestion.name} className="w-12 h-12 rounded object-cover" />
+                  <img
+                    src={
+                      suggestion.imageUrl || "https://via.placeholder.com/50"
+                    }
+                    alt={suggestion.name}
+                    className="w-10 sm:w-12 h-10 sm:h-12 rounded object-cover flex-shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{suggestion.name}</p>
-                    <p className="text-xs text-gray-500">{suggestion.brand}</p>
-                    <p className="text-sm font-bold text-black">${suggestion.lowestPrice.toFixed(2)}</p>
+                    <p className="font-semibold text-xs sm:text-sm truncate">
+                      {suggestion.name}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {suggestion.brand}
+                    </p>
+                    <p className="text-xs sm:text-sm font-bold text-black">
+                      ${suggestion.lowestPrice.toFixed(2)}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -271,43 +308,85 @@ export default function Home() {
               setShowSuggestions(false);
               if (searchInputRef.current) searchInputRef.current.focus();
             }}
-            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold transition-colors flex items-center justify-center sm:justify-start gap-2 flex-shrink-0 text-xs sm:text-base"
           >
-            <X size={18} /> Clear
+            <X size={16} className="sm:w-[18px] sm:h-[18px]" />{" "}
+            <span className="hidden sm:inline">Clear</span>
           </button>
         )}
       </div>
 
-      <div className="mb-6 hidden lg:block">
+      <div className="mb-4 sm:mb-6 hidden lg:block">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-black uppercase tracking-widest text-zinc-600 block">Filter by Category</label>
+          <label className="text-xs sm:text-sm font-black uppercase tracking-widest text-zinc-600 block">
+            Filter by Category
+          </label>
           {selectedCategory && (
-            <button onClick={() => setSelectedCategory("")} className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg font-semibold text-gray-700 transition">
-              <X size={14} className="inline mr-1"/> Clear
+            <button
+              onClick={() => setSelectedCategory("")}
+              className="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-semibold text-gray-700 transition flex items-center gap-1"
+            >
+              <X size={12} className="sm:w-[14px] sm:h-[14px]" /> Clear
             </button>
           )}
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={() => setSelectedCategory("")} className={`px-3 py-2 text-sm rounded-full font-semibold transition-all ${selectedCategory === "" ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}>All</button>
+        <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2">
+          <button
+            onClick={() => setSelectedCategory("")}
+            className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-full font-semibold transition-all ${selectedCategory === "" ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}
+          >
+            All
+          </button>
           {FILTER_CATEGORIES.map((category) => (
-            <button key={category} onClick={() => setSelectedCategory(category)} className={`px-3 py-2 text-sm rounded-full font-semibold transition-all ${selectedCategory === category ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}>{category}</button>
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-full font-semibold transition-all ${selectedCategory === category ? "bg-black text-white" : "bg-white border border-gray-200 text-gray-700 hover:shadow"}`}
+            >
+              {category}
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="mb-6 block lg:hidden">
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm px-3 py-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="mb-4 sm:mb-6 block lg:hidden">
+        <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-sm px-2.5 sm:px-3 py-1.5 sm:py-2 flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <div ref={mobileDropdownRef} className="relative w-full">
-              <button onClick={() => setMobileDropdownOpen((s) => !s)} className="w-full text-left flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-transparent">
-                <span className="truncate text-sm font-semibold text-gray-700">{selectedCategory || "All Categories"}</span>
-                <ChevronDown size={16} className="text-gray-500" />
+              <button
+                onClick={() => setMobileDropdownOpen((s) => !s)}
+                className="w-full text-left flex items-center justify-between gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-transparent"
+              >
+                <span className="truncate text-xs sm:text-sm font-semibold text-gray-700">
+                  {selectedCategory || "All Categories"}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className="sm:w-[16px] sm:h-[16px] text-gray-500 flex-shrink-0"
+                />
               </button>
               {mobileDropdownOpen && (
                 <div className="absolute left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-md max-h-60 overflow-y-auto">
-                  <button onClick={() => { setSelectedCategory(""); setMobileDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-sm font-semibold ${selectedCategory === "" ? "bg-gray-50" : "hover:bg-gray-50"}`}>All Categories</button>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory("");
+                      setMobileDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold ${selectedCategory === "" ? "bg-gray-50" : "hover:bg-gray-50"}`}
+                  >
+                    All Categories
+                  </button>
                   {FILTER_CATEGORIES.map((category) => (
-                    <button key={category} onClick={() => { setSelectedCategory(category); setMobileDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-sm font-semibold ${selectedCategory === category ? "bg-gray-50" : "hover:bg-gray-50"}`}>{category}</button>
+                    <button
+                      key={category}
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setMobileDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold ${selectedCategory === category ? "bg-gray-50" : "hover:bg-gray-50"}`}
+                    >
+                      {category}
+                    </button>
                   ))}
                 </div>
               )}
@@ -316,9 +395,12 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mb-6">
-        <p className="text-sm text-gray-600">
-          Showing <span className="font-bold">{products.length}</span> unique products available from <span className="font-bold">{totalMerchantsCount}</span> different merchants
+      <div className="mb-4 sm:mb-6">
+        <p className="text-xs sm:text-sm text-gray-600 px-1">
+          Showing <span className="font-bold">{products.length}</span> unique
+          products available from{" "}
+          <span className="font-bold">{totalMerchantsCount}</span> different
+          merchants
         </p>
       </div>
 
@@ -333,13 +415,17 @@ export default function Home() {
       ) : products.length === 0 ? (
         <div className="flex items-center justify-center py-32">
           <div className="text-center">
-            <p className="text-gray-500 text-lg font-semibold">No products found</p>
-            <p className="text-gray-400 mt-2">Try adjusting your filters or search term</p>
+            <p className="text-gray-500 text-lg font-semibold">
+              No products found
+            </p>
+            <p className="text-gray-400 mt-2">
+              Try adjusting your filters or search term
+            </p>
           </div>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             {products.map((product) => (
               <Link
                 key={`${product.productId}-${product.variantId}`}
@@ -347,7 +433,6 @@ export default function Home() {
                 className="block group h-full"
               >
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-300 relative flex flex-col h-full group-hover:border-zinc-300">
-                  
                   {/* Out of Stock Badge */}
                   {!product.inStock && (
                     <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest z-10 shadow-sm">
@@ -358,7 +443,10 @@ export default function Home() {
                   {/* Image Container */}
                   <div className="aspect-[4/3] bg-[#f8f8f8] overflow-hidden flex-shrink-0 relative">
                     <img
-                      src={product.imageUrl || "https://via.placeholder.com/400x500"}
+                      src={
+                        product.imageUrl ||
+                        "https://via.placeholder.com/400x500"
+                      }
                       alt={product.name}
                       className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500 mix-blend-multiply"
                     />
@@ -366,7 +454,6 @@ export default function Home() {
 
                   {/* Card Content */}
                   <div className="p-5 flex flex-col flex-grow">
-                    
                     {/* Brand & USP */}
                     <div className="mb-2">
                       <div className="flex justify-between items-start">
@@ -385,11 +472,14 @@ export default function Home() {
                     </div>
 
                     {/* ✅ UPDATED: Professional Spec Pills */}
-                    {((product.attributes && Object.keys(product.attributes).length > 0) ||
-                      (product.specs && Object.keys(product.specs).length > 0)) && (
+                    {((product.attributes &&
+                      Object.keys(product.attributes).length > 0) ||
+                      (product.specs &&
+                        Object.keys(product.specs).length > 0)) && (
                       <div className="mt-4 mb-4">
                         {(() => {
-                          const source = product.attributes || product.specs || {};
+                          const source =
+                            product.attributes || product.specs || {};
                           const entries = Object.entries(source).slice(0, 2); // Show top 2 specs
                           return (
                             <div className="flex flex-wrap gap-2">
@@ -402,7 +492,7 @@ export default function Home() {
                                   <div className="flex-shrink-0 opacity-60">
                                     {getAttributeIcon(String(k))}
                                   </div>
-                                  
+
                                   {/* Text Stack */}
                                   <div className="flex flex-col min-w-0">
                                     <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider leading-none mb-0.5 truncate">
@@ -424,21 +514,29 @@ export default function Home() {
                     <div className="mt-auto pt-4 border-t border-dashed border-gray-200">
                       <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide mb-0.5">Starting at</p>
+                          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide mb-0.5">
+                            Starting at
+                          </p>
                           <span className="text-xl font-black text-zinc-900">
-                            ${product.lowestPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            $
+                            {product.lowestPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-1.5 bg-black text-white px-2.5 py-1.5 rounded-lg">
                           <Store size={12} className="text-zinc-300" />
                           <span className="text-[10px] font-bold uppercase tracking-wide">
-                            {product.totalMerchants} {product.totalMerchants === 1 ? 'Option' : 'Options'}
+                            {product.totalMerchants}{" "}
+                            {product.totalMerchants === 1
+                              ? "Option"
+                              : "Options"}
                           </span>
                         </div>
                       </div>
                     </div>
-
                   </div>
                 </div>
               </Link>
@@ -449,7 +547,9 @@ export default function Home() {
           {isFetchingBatch && (
             <div className="flex flex-col items-center justify-center py-10 gap-4 mt-8">
               <Loader2 className="w-8 h-8 animate-spin text-black" />
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Loading next batch...</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Loading next batch...
+              </p>
             </div>
           )}
           <div ref={sentinelRef} className="h-1 w-full" />
