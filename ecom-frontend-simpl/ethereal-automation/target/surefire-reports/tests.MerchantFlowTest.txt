@@ -1,15 +1,15 @@
 -------------------------------------------------------------------------------
 Test set: tests.MerchantFlowTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 38.36 s <<< FAILURE! -- in tests.MerchantFlowTest
-tests.MerchantFlowTest.merchantEndToEndFlow -- Time elapsed: 38.35 s <<< ERROR!
+Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 38.39 s <<< FAILURE! -- in tests.MerchantFlowTest
+tests.MerchantFlowTest.merchantEndToEndFlow -- Time elapsed: 38.39 s <<< ERROR!
 org.openqa.selenium.TimeoutException: 
 Expected condition failed: waiting for visibility of element located by By.id: merchant-dashboard (tried for 15 second(s) with 500 milliseconds interval)
 Build info: version: '4.17.0', revision: 'e52b1be057*'
 System info: os.name: 'Mac OS X', os.arch: 'x86_64', os.version: '12.7.5', java.version: '17.0.12'
 Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: false, browserName: chrome, browserVersion: 144.0.7559.133, chrome: {chromedriverVersion: 144.0.7559.133 (7da823b1d59..., userDataDir: /var/folders/3_/rcfrql294tq...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:56141}, goog:processID: 21301, networkConnectionEnabled: false, pageLoadStrategy: normal, platformName: mac, proxy: Proxy(), se:cdp: ws://localhost:56141/devtoo..., se:cdpVersion: 144.0.7559.133, setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: c986a07c1cdc612445b03faa287b1fca
+Capabilities {acceptInsecureCerts: false, browserName: chrome, browserVersion: 145.0.7632.45, chrome: {chromedriverVersion: 145.0.7632.46 (9b899469dedf..., userDataDir: /var/folders/3_/rcfrql294tq...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:61469}, goog:processID: 27166, networkConnectionEnabled: false, pageLoadStrategy: normal, platformName: mac, proxy: Proxy(), se:cdp: ws://localhost:61469/devtoo..., se:cdpVersion: 145.0.7632.45, setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: d7a06db2ab7280cf47d0965aedaba011
 	at org.openqa.selenium.support.ui.WebDriverWait.timeoutException(WebDriverWait.java:84)
 	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:228)
 	at pages.BasePage.waitForVisible(BasePage.java:28)
