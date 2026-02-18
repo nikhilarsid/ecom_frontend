@@ -26,6 +26,7 @@ const ModalContent = styled.div`
 `;
 
 export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  //to keep current use state 
   const navigate = useNavigate();
   const location = useLocation();
 

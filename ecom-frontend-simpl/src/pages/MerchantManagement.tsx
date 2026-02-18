@@ -10,6 +10,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import ProductService, { ProductListItem } from '../services/ProductService';
+import { showToast } from '../utils/toast';
 
 // --- SUB-COMPONENT: REAL-TIME ANALYTICS ---
 function VariantAnalytics({ productId, variantId }: { productId: number; variantId: string }) {
@@ -25,7 +26,7 @@ function VariantAnalytics({ productId, variantId }: { productId: number; variant
       
       try {
         const token = localStorage.getItem("token");
-        const url = `https://order-service-p792.onrender.com/api/orders/merchant/${merchantEmail}/stats?productId=${productId}&variantId=${variantId}`;
+        const url = `http://10.65.1.75:8062/api/orders/merchant/${merchantEmail}/stats?productId=${productId}&variantId=${variantId}`;
         
         const res = await fetch(url, {
           headers: {
@@ -93,7 +94,7 @@ export default function MerchantManagement() {
       await ProductService.deleteInventory(productId.toString(), variantId || "");
       fetchProducts();
     } catch (e) {
-      alert("Failed to remove product.");
+      showToast.error("Failed to remove product.");
     }
   };
 
@@ -105,12 +106,12 @@ export default function MerchantManagement() {
           <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase leading-none">Inventory Performance</h1>
         </div>
         
-        <button 
+        {/* <button 
           onClick={() => navigate("/merchant/dashboard")}
           className="bg-black text-white px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2"
         >
           <Plus size={16} /> Add New Listing
-        </button>
+        </button> */}
       </header>
 
       <div className="bg-white border border-zinc-100 rounded-[3.5rem] overflow-hidden shadow-sm">

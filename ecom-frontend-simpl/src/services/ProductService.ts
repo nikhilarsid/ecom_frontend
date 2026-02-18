@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "https://product-service-jzzf.onrender.com/api/v1";
+const BASE_URL = "http://10.65.1.75:8063/api/v1";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -66,6 +66,7 @@ export interface CreateProductPayload {
   description?: string;
   categories: string[];
   specs: Record<string, string>;
+  usp: string[];
   attributes: Record<string, string>;
   price: number;
   quantity: number;
@@ -98,6 +99,11 @@ class ProductService {
     const response = await api.get("/products/my-listings");
     return response.data.data;
   }
+
+async verifyProductExists(name: string, brand: string): Promise<boolean> {
+  const response = await axios.get(`/verify`, { params: { name, brand } });
+  return response.data.data; 
+}
 
   async getProductDetail(
     productId: string,

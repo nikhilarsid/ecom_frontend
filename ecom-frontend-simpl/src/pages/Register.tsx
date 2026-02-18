@@ -171,7 +171,7 @@ export default function Register() {
       password: formData.password,
       role: role,
       phoneNumber: formData.phoneNumber.replace(/\D/g, ""),
-      address: [formData.address.trim()], // Backend expects an array
+      address: formData.address.trim(), // Backend expects an array
     };
 
     if (role === "MERCHANT") {
@@ -183,7 +183,7 @@ export default function Register() {
 
     try {
       const res = await fetch(
-        "https://auth-service-qivh.onrender.com/api/auth/register",
+        "http://10.65.1.75:8060/api/auth/register",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -194,9 +194,13 @@ export default function Register() {
       const data = await res.json();
 
       if (res.ok && data.token) {
+        const initial = "0";
         localStorage.setItem("token", data.token);
+        localStorage.setItem("addresses",data.addresses);
         localStorage.setItem("role", data.role);
         localStorage.setItem("userName", data.firstName);
+         localStorage.setItem("cartCount", initial);
+         
         window.dispatchEvent(new Event("authChange"));
         navigate(role === "MERCHANT" ? "/merchant/dashboard" : "/");
       } else {

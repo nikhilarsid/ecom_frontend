@@ -1,10 +1,9 @@
 pages/CartPage.class
-pages/MerchantManagePage.class
 pages/AuthModal.class
 pages/HomePage.class
 pages/BasePage.class
-pages/RegisterPage.class
 pages/IndividualProductDetailsPage.class
+tests/FlowTest.class
 pages/CheckoutPage.class
 pages/OrdersPage.class
 pages/MerchantHomePage.class
@@ -12,6 +11,3 @@ pages/MerchantDashboardPage.class
 pages/LoginPage.class
 pages/NavComponent.class
 base/BaseTest.class
-tests/UserFlowTest.class
-pages/ProductDetailsPage.class
-tests/MerchantFlowTest.class

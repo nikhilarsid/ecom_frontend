@@ -11,32 +11,46 @@ public abstract class BasePage {
 
     public BasePage(WebDriver driver) {
         this.driver = driver;
+        // 15 seconds is a good sweet spot for React apps
         this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
     }
 
-    // This method must exist and be protected or public for sub-classes to use it
-    protected boolean isVisible(By locator) {
+    // Returns true/false immediately without crashing if element isn't there
+    protected boolean isDisplayed(By locator) {
         try {
-            wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
-            return true;
-        } catch (TimeoutException e) {
+            return driver.findElement(locator).isDisplayed();
+        } catch (NoSuchElementException | StaleElementReferenceException e) {
             return false;
         }
+    }
+    public void waitForLoadingToComplete() {
+        // Targets the Loader2 icon from Lucide (animate-spin class)
+        By spinner = By.cssSelector("svg.animate-spin");
+        waitForInvisibility(spinner);
+    }
+    
+    public void waitForInvisibility(By locator) {
+        wait.until(ExpectedConditions.invisibilityOfElementLocated(locator));
     }
 
     protected void waitForVisible(By locator) {
         wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
     }
 
+    // BETTER: Wait for the element to be ready for an actual click
     protected void click(By locator) {
-        waitForVisible(locator);
-        driver.findElement(locator).click();
+        wait.until(ExpectedConditions.elementToBeClickable(locator)).click();
     }
 
     protected void type(By locator, String text) {
-        waitForVisible(locator);
-        WebElement el = driver.findElement(locator);
+        // Wait for visibility, then find the element
+        WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
         el.clear();
         el.sendKeys(text);
+    }
+
+    // NEW: Needed for your AuthModal to verify the "Sign in Required" text
+    protected String getText(By locator) {
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(locator)).getText();
     }
 }

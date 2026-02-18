@@ -343,7 +343,7 @@ export default function Orders() {
 
     try {
       const res = await fetch(
-        "https://order-service-p792.onrender.com/api/orders/view",
+        "http://10.65.1.75:8062/api/orders/view",
         { headers: getHeaders() },
       );
 
@@ -397,7 +397,7 @@ export default function Orders() {
             if (itemId) {
               // ✅ FIX: Fetch from Order Service using the correct Item ID
               const res = await fetch(
-                `https://order-service-p792.onrender.com/api/orders/viewItem/${itemId}`,
+                `http://10.65.1.75:8062/api/orders/viewItem/${itemId}`,
                 { headers: getHeaders() },
               );
               const json = await res.json();
@@ -567,12 +567,22 @@ export default function Orders() {
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-[9px] font-black text-zinc-300 tracking-[0.2em] uppercase mb-2">
-                      Order #{order.orderId}
-                    </p>
+                    
+                    <span className="text-[9px] font-bold bg-zinc-50 text-zinc-500 px-2 py-0.5 rounded border border-zinc-100 uppercase">
+                      {order.firstName} {order.lastName}
+                    </span>
                     <h3 className="text-3xl font-black tracking-tight leading-none">
                       ${order.totalAmount.toLocaleString()}
                     </h3>
+                    <MapPin size={12} className="mt-0.5 flex-shrink-0" />
+                      <div className="flex flex-col">
+                        <p className="text-[10px] font-bold uppercase leading-tight tracking-tight">
+                          {order.address}
+                        </p>
+                      </div>
+                    <span className={`text-[10px] font-black uppercase tracking-tighter ${order.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      ${order.paymentStatus || 'PENDING'}
+                    </span>
                     <div className="flex items-center gap-3 mt-4">
                       <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-r border-zinc-200 pr-3">
                         {new Date(order.orderDate).toLocaleDateString()}

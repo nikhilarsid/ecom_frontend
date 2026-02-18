@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { showToast } from "../utils/toast"; // Ensure this is imported
 
+
 // --- ANIMATIONS ---
 const spin = keyframes`from { transform: rotate(0deg); } to { transform: rotate(360deg); }`;
 const Spinner = styled(Loader2)`
@@ -41,7 +42,7 @@ const FeedbackBanner = styled.div<{ $type: "error" | "info" }>`
   gap: 16px;
 `;
 
-const CartItem = styled.div`
+const CartItem = styled(Link)`
   display: flex;
   align-items: center;
   gap: 24px;
@@ -93,7 +94,7 @@ export default function Cart() {
       "Content-Type": "application/json",
     };
   };
-
+  
   const fetchCart = async () => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
@@ -112,7 +113,7 @@ export default function Cart() {
 
     try {
       const res = await fetch(
-        "https://order-service-p792.onrender.com/api/cart/view",
+        "http://10.65.1.75:8062/api/cart/view",
         { headers: getHeaders() }
       );
       const json = await res.json();
@@ -125,7 +126,7 @@ export default function Cart() {
           items.map(async (item: any) => {
             try {
               const pRes = await fetch(
-                `https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`
+                `http://10.65.1.75:8063/api/v1/products/${item.productId}?variantId=${item.variantId}`
               );
               const pJson = await pRes.json();
               return {
@@ -148,38 +149,45 @@ export default function Cart() {
     }
   };
 
-  const handleDeleteItem = async (itemId: string, currentQuantity: number) => {
-    setDeleting(Number(itemId));
-    try {
-      const res = await fetch(
-        `https://order-service-p792.onrender.com/api/cart/deleteItem/${itemId}?quantity=${currentQuantity}`,
-        {
-          method: "DELETE",
-          headers: getHeaders(),
-        }
-      );
+  const handleDeleteItem = async (e: React.MouseEvent, itemId: string, currentQuantity: number) => {
+  e.preventDefault();
+  e.stopPropagation();
+  setDeleting(Number(itemId));
+  try {
+    const res = await fetch(`http://10.65.1.75:8062/api/cart/deleteItem/${itemId}?quantity=${currentQuantity}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
 
-      const json = await res.json();
-      if (json.success) {
-        await fetchCart();
-        window.dispatchEvent(new Event("cartUpdated"));
-        showToast.success("Item removed from cart");
-      } else {
-        showToast.error(json.message || "Failed to remove item");
-      }
-    } catch (e) {
-      showToast.error("Failed to remove item");
-    } finally {
-      setDeleting(null);
+    const json = await res.json();
+    if (json.success) {
+      // --- CHANGE HERE ---
+      const currentTotal = parseInt(localStorage.getItem("cartCount") || "0");
+      const newTotal = Math.max(0, currentTotal - currentQuantity);
+      localStorage.setItem("cartCount", newTotal.toString());
+      
+      await fetchCart();
+      // Dispatch custom event with the new number
+      window.dispatchEvent(new CustomEvent("cartUpdated", { detail: { count: newTotal } }));
+      showToast.success("Item removed from cart");
+    } else {
+      showToast.error("Failed to remove item.");
     }
-  };
+  } catch (e) {
+    showToast.error("Failed to remove item");
+  } finally {
+    setDeleting(null);
+  }
+};
 
   // Quantity adjustment state
-  const [adjustingId, setAdjustingId] = useState<string | null>(null);
-
-  const handleIncrease = async (item: any) => {
+  const [adjusting, setAdjustingId] = useState<{ id: string; type: "plus" | "minus" } | null>(null);
+  const handleIncrease = async (e:React.MouseEvent ,item: any) => {
+    
+    e.preventDefault();
+    e.stopPropagation();
     const id = item.itemId || item.merchantProductId || item.productId;
-    setAdjustingId(String(id));
+    setAdjustingId({id, type:"plus"});
     try {
       const body = {
         productId: item.productId || item.merchantProductId,
@@ -188,17 +196,17 @@ export default function Cart() {
         quantity: 1,
       };
 
-      const res = await fetch(
-        "https://order-service-p792.onrender.com/api/cart/addItem",
-        {
-          method: "POST",
-          headers: getHeaders(),
-        },
-      ); // NOTE: You missed the 'body' in your pasted code, fixed here:
+      // const res = await fetch(
+      //   "http://localhost:8062/api/cart/addItem",
+      //   {
+      //     method: "POST",
+      //     headers: getHeaders(),
+      //   },
+      // ); // NOTE: You missed the 'body' in your pasted code, fixed here:
       
       // Actual Fetch Call with Body
       const resWithBody = await fetch(
-        "https://order-service-p792.onrender.com/api/cart/addItem",
+        "http://10.65.1.75:8062/api/cart/addItem",
         {
           method: "POST",
           headers: getHeaders(),
@@ -208,26 +216,31 @@ export default function Cart() {
 
       const json = await resWithBody.json();
       if (json.success) {
-        await fetchCart();
+        const nextCount = parseInt(localStorage.getItem("cartCount") || "0") + 1;
+      localStorage.setItem("cartCount", nextCount.toString());
+
+      await fetchCart();
         window.dispatchEvent(new Event("cartUpdated"));
         // Optional: showToast.success("Quantity updated");
       } else {
         // ✅ CHANGED from alert to toast
-        showToast.error(json.message || "Cannot increase quantity (Stock limit reached)");
+        showToast.error("Cannot increase quantity (Stock limit reached)");
       }
     } catch (e) {
-      showToast.error("Network error. Could not update quantity.");
+      showToast.error("Unable to update cart. Please try again later");
     } finally {
       setAdjustingId(null);
     }
   };
 
-  const handleDecrease = async (item: any) => {
+  const handleDecrease = async (e:React.MouseEvent ,item: any) => {
+    e.preventDefault();
+    e.stopPropagation();
     const id = item.itemId || item.merchantProductId || item.productId;
-    setAdjustingId(String(id));
+    setAdjustingId({id, type:"minus"});
     try {
       const res = await fetch(
-        `https://order-service-p792.onrender.com/api/cart/deleteItem/${id}?quantity=1`,
+        `http://10.65.1.75:8062/api/cart/deleteItem/${id}?quantity=1`,
         {
           method: "DELETE",
           headers: getHeaders(),
@@ -236,14 +249,16 @@ export default function Cart() {
 
       const json = await res.json();
       if (json.success) {
+        const nextCount = Math.max(0, parseInt(localStorage.getItem("cartCount") || "0") - 1);
+      localStorage.setItem("cartCount", nextCount.toString());
         await fetchCart();
         window.dispatchEvent(new Event("cartUpdated"));
       } else {
         // ✅ CHANGED from alert to toast
-        showToast.error(json.message || "Failed to decrease quantity");
+        showToast.error( "Failed to decrease quantity try again later");
       }
     } catch (e) {
-      showToast.error("Network error. Could not update quantity.");
+      showToast.error("Network error. Could not update quantity. please try again later");
     } finally {
       setAdjustingId(null);
     }
@@ -330,7 +345,11 @@ export default function Cart() {
 
       <div className="space-y-2">
         {displayItems.map((item: any) => (
-          <CartItem key={`${item.merchantProductId}-${item.itemId}`}>
+          <CartItem 
+            key={`${item.merchantProductId}-${item.itemId}`}
+            to={`/product/${item.productId}?variantId=${item.variantId}`}
+          >
+          
             <div className="w-32 h-32 bg-zinc-50 rounded-3xl overflow-hidden border border-zinc-100 p-2 relative flex items-center justify-center">
               {item.imageUrl ? (
                 <img
@@ -367,16 +386,12 @@ export default function Cart() {
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => handleDecrease(item)}
-                  disabled={
-                    adjustingId ===
-                    String(item.itemId || item.merchantProductId)
-                  }
+                  onClick={(e) => handleDecrease(e,item)}
+                  disabled={adjusting !== null}
                   className="p-2 bg-zinc-100 rounded-md hover:bg-zinc-200 disabled:opacity-50"
                   title="Decrease quantity"
                 >
-                  {adjustingId ===
-                  String(item.itemId || item.merchantProductId) ? (
+                  {adjusting?.id === String(item.itemId || item.merchantProductId) && adjusting?.type === "minus"? (
                     <Spinner size={14} />
                   ) : (
                     <Minus size={16} />
@@ -388,16 +403,12 @@ export default function Cart() {
                 </span>
 
                 <button
-                  onClick={() => handleIncrease(item)}
-                  disabled={
-                    adjustingId ===
-                    String(item.itemId || item.merchantProductId)
-                  }
+                  onClick={(e) => handleIncrease(e, item)}
+                  disabled={adjusting !== null}
                   className="p-2 bg-zinc-100 rounded-md hover:bg-zinc-200 disabled:opacity-50"
                   title="Increase quantity"
                 >
-                  {adjustingId ===
-                  String(item.itemId || item.merchantProductId) ? (
+                  {adjusting?.id === String(item.itemId || item.merchantProductId) && adjusting?.type === "plus" ? (
                     <Spinner size={14} />
                   ) : (
                     <Plus size={16} />
@@ -410,7 +421,7 @@ export default function Cart() {
                 ${(item.price * item.quantity).toLocaleString()}
               </p>
               <button
-                onClick={() => handleDeleteItem(item.itemId, item.quantity)}
+                onClick={(e) => handleDeleteItem(e, item.itemId, item.quantity)}
                 disabled={deleting === Number(item.itemId)}
                 className="text-zinc-300 hover:text-red-500 transition-colors p-2"
               >
@@ -422,9 +433,10 @@ export default function Cart() {
               </button>
             </div>
           </CartItem>
+          
         ))}
       </div>
-
+    
       <SummaryBox>
         <div>
           <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em] mb-2">
@@ -453,5 +465,6 @@ export default function Cart() {
         <ArrowLeft size={16} /> Continue Exploring
       </Link>
     </CartContainer>
+    
   );
 }

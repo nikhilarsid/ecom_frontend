@@ -5,8 +5,8 @@ import org.openqa.selenium.WebDriver;
 
 public class MerchantHomePage extends BasePage {
 
-    private By dashboardLink = By.id("merchant-dashboard");
-    private By manageProductsLink = By.id("merchant-manage");
+    private final By dashboardLink = By.xpath("//nav//a[@href='/merchant/dashboard']");
+    private final By manageProductsLink = By.xpath("//nav//a[@href='/merchant/manage']");  
     private By logoutBtn = By.id("logout");
 
     // Updated: Selector for the "Add New Product" button in MerchantHome.tsx

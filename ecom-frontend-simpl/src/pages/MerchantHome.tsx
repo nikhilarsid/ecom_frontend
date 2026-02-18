@@ -44,7 +44,8 @@ const StatCard = styled.div`
 
 export default function MerchantHome() {
   const navigate = useNavigate();
-  const userName = localStorage.getItem("userName");
+  const nameDefault = "User";
+  const userName = localStorage.getItem("userName") || nameDefault;
   // Ensure merchantId is assigned the email address stored in localStorage
   const merchantId = localStorage.getItem("userName"); 
 
@@ -69,7 +70,7 @@ export default function MerchantHome() {
     try {
       // Fetch Total Revenue
       const revRes = await fetch(
-        `https://order-service-p792.onrender.com/api/orders/merchant/${merchantId}/total-revenue`,
+        `http://10.65.1.75:8062/api/orders/merchant/${merchantId}/total-revenue`,
         { headers: getHeaders() }
       );
       if (revRes.ok) {
@@ -81,7 +82,7 @@ export default function MerchantHome() {
 
       // Fetch Total Orders
       const ordRes = await fetch(
-        `https://order-service-p792.onrender.com/api/orders/merchant/${merchantId}/total-orders`,
+        `http://10.65.1.75:8062/api/orders/merchant/${merchantId}/total-orders`,
         { headers: getHeaders() }
       );
       if (ordRes.ok) {
@@ -117,8 +118,9 @@ export default function MerchantHome() {
         <span className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.4em]">
           Seller Central
         </span>
-        <h1 className="text-6xl font-black tracking-tighter mt-4 italic uppercase leading-none">
-          Welcome, {userName || "Partner"}
+        <h1 className="text-6xl font-black tracking-tighter mt-4 italic leading-none">
+          
+          Welcome, { localStorage.getItem("firstName") || "Partner"}
         </h1>
 
         <StatsGrid>
@@ -151,12 +153,12 @@ export default function MerchantHome() {
             <h3 className="text-2xl font-black tracking-tight uppercase">Current Listings</h3>
             <p className="text-zinc-400 text-sm font-medium">Manage your active products</p>
           </div>
-          <button 
+          {/* <button 
             onClick={() => navigate("/merchant/manage")} 
             className="bg-black text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-colors"
           >
             <Plus size={16} /> Add New Product
-          </button>
+          </button> */}
         </div>
 
         {loading ? (

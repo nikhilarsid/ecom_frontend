@@ -28,7 +28,7 @@ const FILTER_CATEGORIES = [
   "Toys",
 ];
 
-// Enhanced Icon Logic
+// Enhanced Icon Logic -> for products specs
 const getAttributeIcon = (key: string) => {
   const k = key.toLowerCase();
   if (k.includes("storage") || k.includes("memory"))
@@ -41,6 +41,8 @@ const getAttributeIcon = (key: string) => {
 };
 
 export default function Home() {
+
+  //for search and discovery flow
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,16 +54,16 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  //to remove the suggestion box when clicked outside the box 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const suggestionsRef = useRef<HTMLDivElement | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // ... (Existing useEffects and handlers remain exactly the same) ...
-  // [Copy-paste your existing useEffects, handleSearchChange, etc. here]
-  // To save space, I am focusing on the render part below where the change happens.
 
+  // to exit the drop down when clicked somewhere else
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const el = mobileDropdownRef.current;
@@ -71,9 +73,13 @@ export default function Home() {
       }
     };
     document.addEventListener("mousedown", handler);
+
+    //clean up
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+
+  //to not exit when the user clicks on one of the suggestions or inside the search box
   useEffect(() => {
     const outsideHandler = (e: MouseEvent) => {
       const sug = suggestionsRef.current;
@@ -97,6 +103,7 @@ export default function Home() {
     };
   }, []);
 
+  //pagination along with loading products
   useEffect(() => {
     fetchAllProducts(0);
   }, []);
@@ -105,6 +112,7 @@ export default function Home() {
     applyFilters();
   }, [searchTerm, selectedCategory, allProducts]);
 
+  //debounce search 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -184,6 +192,7 @@ export default function Home() {
     return () => observer.disconnect();
   }, [sentinelRef.current, currentPage, loading, isFetchingBatch, hasMore]);
 
+  //filter logic: if the search term is empty loads 100 prodcuts form backend query
   const applyFilters = async () => {
     if (searchTerm.trim()) {
       try {
@@ -240,6 +249,7 @@ export default function Home() {
     setProducts(allProducts);
   };
 
+  //dynamically change the merchant code
   const totalMerchantsCount = products
     .filter((p) => p !== null)
     .reduce((acc, product) => acc + (product.totalMerchants || 0), 0);
@@ -473,13 +483,11 @@ export default function Home() {
 
                     {/* ✅ UPDATED: Professional Spec Pills */}
                     {((product.attributes &&
-                      Object.keys(product.attributes).length > 0) ||
-                      (product.specs &&
-                        Object.keys(product.specs).length > 0)) && (
+                      Object.keys(product.attributes).length > 0)) && (
                       <div className="mt-4 mb-4">
                         {(() => {
                           const source =
-                            product.attributes || product.specs || {};
+                            product.attributes || {};
                           const entries = Object.entries(source).slice(0, 2); // Show top 2 specs
                           return (
                             <div className="flex flex-wrap gap-2">

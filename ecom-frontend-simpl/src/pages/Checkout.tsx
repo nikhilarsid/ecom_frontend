@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import styled from "styled-components";
-import emailjs from "@emailjs/browser"; // ✅ Imported EmailJS
+// import emailjs from "@emailjs/browser"; // ✅ Imported EmailJS
 import {
   ShieldCheck,
   Truck,
@@ -14,6 +14,62 @@ import {
 import { showToast } from "../utils/toast";
 
 // --- STYLED COMPONENTS ---
+const RecentAddressesWrapper = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+`;
+
+const ButtonSpinner = styled(Loader2)`
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+`;
+const PrimaryButton = styled.button`
+  position: relative; /* Context for the absolute spinner */
+  width: 100%;
+  background: white;
+  color: black;
+  padding: 20px;
+  border-radius: 16px;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 14px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+`;
+const AddressPill = styled.button`
+  background: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+  }
+`;
+
 const CheckoutContainer = styled.div`
   max-width: 1200px;
   margin: 0 auto;
@@ -33,10 +89,11 @@ const Section = styled.section`
 `;
 
 const Title = styled.h2`
-  font-size: 20px;
+  font-size: 25px;
   font-weight: 900;
   display: flex;
   align-items: center;
+  padding-bottom: 20px;
   gap: 12px;
   text-transform: uppercase;
 `;
@@ -109,16 +166,68 @@ export default function Checkout() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
-  const [formData, setFormData] = useState({ firstName: "", lastName: "", address: "", city: "", postalCode: "", paymentDetail: "" });
+  const [formData, setFormData] = useState({ firstName: "", lastName: "", address: "", paymentDetail: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [enrichedItems, setEnrichedItems] = useState<any[]>([]);
 
+  const token = localStorage.getItem("token");
+  const currentUserEmail = localStorage.getItem("userName");
+
+  const [recentAddresses, setRecentAddresses] = useState<string[]>([]);
+
+// Load addresses when component starts
+useEffect(() => {
+  const saved = localStorage.getItem("recentAddresses");
+  const legacy = localStorage.getItem("addresses");
+
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setRecentAddresses(parsed);
+        return; // Exit early if we have a clean array
+      }
+    } catch (e) {
+      // If parsing fails, fall through to string handling
+    }
+  }
+
+  // Handle the "One Box" Problem (Legacy or Corrupted Saved Data)
+  const rawData = saved || legacy;
+  if (rawData) {
+    // 1. Clean up quotes and URL encoding (%20)
+    const cleanData = decodeURIComponent(rawData).replace(/'/g, "");
+
+    // 2. SPLIT logic: Change the delimiter based on how your old data was stored.
+    // If they were separated by commas: cleanData.split(',')
+    // If they were just stuck together, we wrap the whole thing.
+    const splitAddresses = cleanData.split(',').map(a => a.trim()).filter(Boolean);
+    
+    setRecentAddresses(splitAddresses);
+  }
+}, []);
+
+// Function to update the list
+const saveAddressLocally = (newAddress: string) => {
+  // Ensure we are working with an array
+  let currentList = Array.isArray(recentAddresses) ? [...recentAddresses] : [];
+  
+  // Filter out duplicates
+  currentList = currentList.filter(a => a.toLowerCase() !== newAddress.toLowerCase());
+  
+  // Add new to top and limit to 5
+  const updatedList = [newAddress, ...currentList].slice(0, 5);
+  
+  // CRITICAL: Save as a JSON stringified array
+  localStorage.setItem("recentAddresses", JSON.stringify(updatedList));
+  setRecentAddresses(updatedList);
+};
   useEffect(() => {
     if (cart?.items) {
       const fetchDetails = async () => {
         const enriched = await Promise.all(cart.items.map(async (item: any) => {
           try {
-            const res = await fetch(`https://product-service-jzzf.onrender.com/api/v1/products/${item.productId}?variantId=${item.variantId}`);
+            const res = await fetch(`http://10.65.1.75:8063/api/v1/products/${item.productId}?variantId=${item.variantId}`);
             const json = await res.json();
             return { ...item, name: json.data.name, img: json.data.imageUrls?.[0] };
           } catch (e) { return { ...item, name: "Product", img: null }; }
@@ -137,54 +246,74 @@ export default function Checkout() {
     const postalRegex = /^\d{5,6}$/;
     if (!nameRegex.test(formData.firstName)) newErrors.firstName = "Letters only (2-30)";
     if (!nameRegex.test(formData.lastName)) newErrors.lastName = "Letters only (2-30)";
-    if (!formData.address.trim()) newErrors.address = "Address required";
-    if (!nameRegex.test(formData.city)) newErrors.city = "Letters only";
-    if (!postalRegex.test(formData.postalCode)) newErrors.postalCode = "5-6 digit code";
-    if (paymentMethod === "upi" && !formData.paymentDetail.trim()) newErrors.paymentDetail = "UPI ID required";
-    setErrors(newErrors);
+    if (!nameRegex.test(formData.address)) newErrors.address = "Letters only (2-30)";
+    // if (!nameRegex.test(formData.city)) newErrors.city = "Letters only";
+    // if (!postalRegex.test(formData.postalCode)) newErrors.postalCode = "5-6 digit code";
+if (paymentMethod === "upi") {
+    const upiValue = formData.paymentDetail.trim();
+    const upiRegex = /^[\w.-]+@[\w.-]+$/; // Basic vpa@bank check
+
+    if (!upiValue) {
+      newErrors.paymentDetail = "UPI ID is required for this method";
+    } else if (!upiRegex.test(upiValue)) {
+      newErrors.paymentDetail = "Invalid UPI ID format (e.g. name@okaxis)";
+    }
+  }
+      setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   // ✅ Helper to send email via EmailJS
   // ✅ UPDATE THIS FUNCTION
-  const sendConfirmationEmail = (orderId, totalAmount) => {
-    const templateParams = {
-      customer_name: `${formData.firstName} ${formData.lastName}`,
-      to_email: localStorage.getItem("userName"),
-      order_id: orderId,         // ✅ NEW: Sending Order ID
-      total_amount: totalAmount, // ✅ NEW: Sending Total Amount
-    };
-
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY)
-      .then((response) => {
-        console.log('✅ Email sent successfully!', response.status, response.text);
-      })
-      .catch((err) => {
-        console.error('❌ Failed to send email:', err);
+  const sendConfirmationEmail = async () => {
+    try {
+      await fetch("http://10.65.1.75:8064/api/notify/email", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({
+          to: currentUserEmail,
+          subject: `Order Confirmation: `,
+          message: `Thank you for your purchase!`,
+          firstName: formData.firstName // Passing this in case your notify template needs it
+        }), 
       });
+      console.log("Notify Service triggered");
+    } catch (e) {
+      console.error("Notify Service failed", e);
+    }
   };
 
   const handlePlaceOrder = async () => {
     if (!validate()) { showToast.error("Fix form errors"); return; }
     setIsProcessing(true);
     const token = localStorage.getItem("token");
-
+    const orderPayload = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      address: formData.address,
+      paymentStatus: paymentMethod === "upi" ? "PAID" : "PENDING"    
+    };
+    
     try {
       // Placing order. 
       // NOTE: We do not send image URLs. The backend pulls from the Cart DB.
-      const res = await fetch("https://order-service-p792.onrender.com/api/orders/add", {
+      const res = await fetch("http://10.65.1.75:8062/api/orders/add", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}), 
+        body: JSON.stringify(orderPayload), 
       });
 
       const json = await res.json();
 
       // If the backend returns 500 but also says "success: true" or if the order was created
       if (json.success || res.status === 200 || res.status === 201) {
-        
-        // ✅ UPDATE THIS LINE to pass the data
-        sendConfirmationEmail(json.data || "Pending", cart.totalValue);
+        saveAddressLocally(formData.address); 
+        // // ✅ UPDATE THIS LINE to pass the data
+        sendConfirmationEmail();
+        localStorage.setItem("cartCount","0");
 
         showToast.success("Order Placed Successfully! Please check your email for confirmation.");
         window.dispatchEvent(new Event("cartUpdated"));
@@ -207,7 +336,7 @@ export default function Checkout() {
       <div>
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-zinc-400 font-bold text-xs uppercase mb-8"><ArrowLeft size={14} /> Back</button>
         <Section>
-          <Title><Truck size={20} /> Shipping Details</Title>
+          <Title><Truck size={30} /> Shipping Details </Title>
           <div className="grid grid-cols-2 gap-5 mb-5">
             <InputWrapper>
               <StyledInput placeholder="First Name" $hasError={!!errors.firstName} value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
@@ -222,10 +351,29 @@ export default function Checkout() {
             <StyledInput placeholder="Address" $hasError={!!errors.address} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
             {errors.address && <ErrorText>{errors.address}</ErrorText>}
           </InputWrapper>
-          <div className="grid grid-cols-2 gap-5">
-            <InputWrapper><StyledInput placeholder="City" $hasError={!!errors.city} value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />{errors.city && <ErrorText>{errors.city}</ErrorText>}</InputWrapper>
-            <InputWrapper><StyledInput placeholder="Postal Code" $hasError={!!errors.postalCode} value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} />{errors.postalCode && <ErrorText>{errors.postalCode}</ErrorText>}</InputWrapper>
-          </div>
+
+          {recentAddresses.length > 0 && (
+  <div className="mt-4">
+    <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+      Recently Used
+    </p>
+    <RecentAddressesWrapper>
+      {recentAddresses.map((addr, idx) => (
+        <AddressPill 
+          key={idx} 
+          type="button" // Important: prevents form submission
+          onClick={() => setFormData({...formData, address: addr})}
+        >
+          {addr}
+        </AddressPill>
+      ))}
+    </RecentAddressesWrapper>
+  </div>
+)}
+          {/* <div className="grid grid-cols-2 gap-5">
+            {/* <InputWrapper><StyledInput placeholder="City" $hasError={!!errors.city} value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />{errors.city && <ErrorText>{errors.city}</ErrorText>}</InputWrapper>
+            <InputWrapper><StyledInput placeholder="Postal Code" $hasError={!!errors.postalCode} value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} />{errors.postalCode && <ErrorText>{errors.postalCode}</ErrorText>}</InputWrapper> */}
+          {/* </div> */} 
         </Section>
         <Section>
           <Title><CreditCard size={20} /> Payment Method</Title>
@@ -247,9 +395,17 @@ export default function Checkout() {
           </SummaryItem>
         ))}
         <div className="flex justify-between text-xl font-black mt-10"><span>Total</span><span>${cart.totalValue.toLocaleString()}</span></div>
-        <button onClick={handlePlaceOrder} disabled={isProcessing} className="w-full bg-white text-black py-5 rounded-2xl font-black text-sm uppercase mt-10 hover:bg-zinc-200 transition-colors">
-          {isProcessing ? <Loader2 className="animate-spin" size={20} /> : "Complete Purchase"}
-        </button>
+        <PrimaryButton 
+  onClick={handlePlaceOrder} 
+  disabled={isProcessing}
+>
+  {/* Hide text but keep its space to maintain button width/height */}
+  <span style={{ opacity: isProcessing ? 0 : 1 }}>
+    Complete Purchase
+  </span>
+
+  {isProcessing && <ButtonSpinner size={20} />}
+</PrimaryButton>
         <div className="flex items-center justify-center gap-2 mt-6 text-zinc-500 text-[10px] font-bold uppercase tracking-widest"><ShieldCheck size={14} /> Secure Checkout</div>
       </OrderSummary>
     </CheckoutContainer>

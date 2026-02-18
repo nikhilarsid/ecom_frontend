@@ -1,7 +1,9 @@
 import { ReactNode, useState, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { ShoppingBag, User, LogOut, Menu, X } from "lucide-react";
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+import { ShoppingBag, User, LogOut, LogIn, Menu, X } from "lucide-react";
 
 // --- STYLED COMPONENTS ---
 const NavWrapper = styled.nav`
@@ -145,12 +147,12 @@ const MainContent = styled.main`
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 12px 16px;
   @media (min-width: 640px) {
-    padding: 48px 24px;
+    padding: 15px 24px;
   }
   @media (min-width: 1024px) {
-    padding: 48px 40px;
+    padding: 10px 24px;
   }
 `;
 
@@ -167,6 +169,7 @@ const UserGreet = styled.span`
 `;
 
 export default function Layout({ children }: { children: ReactNode }) {
+  const MySwal = withReactContent(Swal);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -174,7 +177,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [role, setRole] = useState(localStorage.getItem("role"));
   const [userName, setUserName] = useState(localStorage.getItem("userName"));
-  const [cartCount, setCartCount] = useState(0);
+  const [cartCount, setCartCount] = useState<number>(() => 
+  parseInt(localStorage.getItem("cartCount") || "0")
+);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Role Detection
@@ -183,63 +188,85 @@ export default function Layout({ children }: { children: ReactNode }) {
   // Logic to determine where the Logo takes the user
   const logoDestination = isMerchant ? "/merchant" : "/";
 
-  const fetchCartCount = async () => {
-    const activeToken = localStorage.getItem("token");
-    const activeRole = localStorage.getItem("role");
+  // const fetchCartCount = async () => {
+  //   const activeToken = localStorage.getItem("token");
+  //   const activeRole = localStorage.getItem("role");
 
-    // Merchants do not have a customer cart
-    if (!activeToken || activeRole === "MERCHANT") {
-      setCartCount(0);
-      return;
-    }
+  //   // Merchants do not have a customer cart
+  //   if (!activeToken || activeRole === "MERCHANT") {
+  //     setCartCount(0);
+  //     return;
+  //   }
 
-    try {
-      const res = await fetch(
-        "https://order-service-p792.onrender.com/api/cart/view",
-        {
-          headers: { Authorization: `Bearer ${activeToken}` },
-        },
-      );
-      const json = await res.json();
-      if (json.success) {
-        // Change: sum the quantity of each item instead of using items.length
-        const totalQuantity = json.data.items.reduce(
-          (acc: number, item: any) => acc + item.quantity,
-          0,
-        );
-        setCartCount(totalQuantity);
-      }
-    } catch (e) {
-      console.error("Cart count fetch failed", e);
-    }
-  };
+  //   try {
+  //     const res = await fetch(
+  //       "http://localhost:8062/api/cart/view",
+  //       {
+  //         headers: { Authorization: `Bearer ${activeToken}` },
+  //       },
+  //     );
+  //     const json = await res.json();
+  //     if (json.success) {
+  //       // Change: sum the quantity of each item instead of using items.length
+  //       const totalQuantity = json.data.items.reduce(
+  //         (acc: number, item: any) => acc + item.quantity,
+  //         0,
+  //       );
+  //       setCartCount(totalQuantity);
+  //     }
+  //   } catch (e) {
+  //     console.error("Cart count fetch failed", e);
+  //   }
+  // };
 
   const syncAuth = () => {
-    setToken(localStorage.getItem("token"));
-    setRole(localStorage.getItem("role"));
-    setUserName(localStorage.getItem("firstName"));
-    fetchCartCount();
+  setToken(localStorage.getItem("token"));
+  setRole(localStorage.getItem("role"));
+  setUserName(localStorage.getItem("firstName"));
+  
+  // Instead of fetchCartCount(), we grab the saved count
+  const savedCount = parseInt(localStorage.getItem("cartCount") || "0");
+  setCartCount(savedCount);
+};
+
+useEffect(() => {
+  syncAuth();
+
+  // This handler listens for manual "plus/minus" updates from other components
+  const handleCartManualUpdate = (event: any) => {
+    const newCount = event.detail?.count ?? parseInt(localStorage.getItem("cartCount") || "0");
+    setCartCount(newCount);
   };
 
-  useEffect(() => {
-    syncAuth();
+  window.addEventListener("authChange", syncAuth);
+  window.addEventListener("cartUpdated", handleCartManualUpdate);
 
-    // Listen for custom events (Auth changes or Cart additions)
-    window.addEventListener("authChange", syncAuth);
-    window.addEventListener("cartUpdated", fetchCartCount);
+  return () => {
+    window.removeEventListener("authChange", syncAuth);
+    window.removeEventListener("cartUpdated", handleCartManualUpdate);
+  };
+}, [location.pathname]);
 
-    return () => {
-      window.removeEventListener("authChange", syncAuth);
-      window.removeEventListener("cartUpdated", fetchCartCount);
-    };
-  }, [location.pathname]);
-
+  const [isConfirming, setIsConfirming] = useState(false);
   const handleLogout = () => {
-    localStorage.clear();
-    syncAuth();
-    navigate("/login");
-    window.dispatchEvent(new Event("authChange"));
-    setMobileMenuOpen(false);
+    // 1. Trigger the confirmation dialog
+    // const confirmed = window.confirm("Are you sure you want to logout?");
+
+    if (true) {
+      // 2. Perform Logout
+      localStorage.clear();
+      syncAuth();
+      navigate("/login");
+      window.dispatchEvent(new Event("authChange"));
+      setMobileMenuOpen(false);
+      
+      // Optional: Show success toast
+      // toast.success("Logged out successfully"); 
+    } else {
+      // 3. Optional: User clicked "Cancel"
+      console.log("Logout aborted");
+      // toast.error("Logout cancelled", { icon: <X size={16} /> });
+    }
   };
 
   const closeMobileMenu = () => {
@@ -302,35 +329,51 @@ export default function Layout({ children }: { children: ReactNode }) {
               </CartBadge>
             )}
 
-            {token ? (
-              <button
-                onClick={handleLogout}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                <LogOut size={20} strokeWidth={2.5} />
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  navigate("/login");
-                  closeMobileMenu();
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                <User size={20} strokeWidth={2.5} />
-              </button>
-            )}
-
+          {!token && (
+            <Link
+              to = "/login"
+            >
+              LogIn
+            </Link> 
+          )}
+            
+            {token && (
+  <button
+    onClick={() => {
+      MySwal.fire({
+        title: 'Are you sure?',
+    text: "Do you want to log out?.",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#000000', // Matches your black buttons
+    cancelButtonColor: '#000000',
+    confirmButtonText: 'Yes, Logout!',
+    cancelButtonText: 'Cancel',
+    reverseButtons: true,
+    background: '#ffffff',
+    color: '#000000',
+    // borderRadius: '32px', // Matches your card styling
+    customClass: {
+      confirmButton: 'font-black uppercase text-[10px] tracking-widest px-8 py-4 rounded-xl',
+      cancelButton: 'font-black uppercase text-[10px] tracking-widest px-8 py-4 rounded-xl text-zinc-400'
+    }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          handleLogout();
+        }
+      });
+    }}
+    style={{
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#18181b",
+      transition: "all 0.2s ease"
+    }}
+  >
+    <LogOut size={20} strokeWidth={2.5} />
+  </button>
+)}
             <HamburgerButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </HamburgerButton>

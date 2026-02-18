@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { toast } from 'sonner';
 
 const AuthContainer = styled.div`
   max-width: 400px;
@@ -25,6 +26,11 @@ const Input = styled.input`
   &:focus { border-color: #000; background: white; }
 `;
 
+interface CartItem {
+  quantity: number;
+  // add other fields if needed, e.g., productId: number;
+}
+
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -36,19 +42,34 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('https://auth-service-qivh.onrender.com/api/auth/login', {
+      const res = await fetch('http://10.65.1.75:8060/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       
-      const data = await res.json();
-
-      if (data.token) {
+  const data = await res.json();
+      
+  if (data.token) {
   localStorage.setItem('token', data.token);
+  localStorage.setItem('addresses',data.addresses || "No address found");
   localStorage.setItem('role', data.role);
   localStorage.setItem('userName', formData.email); // Store email for API calls
   
+  const res = await fetch("http://10.65.1.75:8062/api/cart/view", {
+        headers: { Authorization: `Bearer ${data.token}` },
+      });
+      const json = await res.json();
+      if (json.success) {
+        const totalQuantity = json.data.items.reduce(
+      (acc: number, item: CartItem) => acc + item.quantity, 
+      0
+    );
+        localStorage.setItem("cartCount", totalQuantity.toString());
+        // Trigger layout to update
+        window.dispatchEvent(new Event("authChange")); 
+      }
+    
   // Explicitly store firstName for the 'Hi, Name' greeting
   const greetingName = data.firstName || formData.email.split('@')[0];
   localStorage.setItem('firstName', greetingName); 
@@ -58,13 +79,13 @@ export default function Login() {
       window.dispatchEvent(new Event("authChange"));
       
       // Redirect back to the product page instead of Home
-      navigate(data.role === 'MERCHANT' ? '/merchant/dashboard' : from, { replace: true });
+      navigate(data.role === 'MERCHANT' ? '/merchant' : from, { replace: true });
 } else {
-        alert("Login failed. Check credentials.");
+        toast("Login failed. Check credentials.");
       }
     } catch (e) {
       console.error(e);
-      alert("An error occurred. Please try again.");
+      showToast.error("An error occurred. Please try again.");
     } finally { 
       setLoading(false);
     }

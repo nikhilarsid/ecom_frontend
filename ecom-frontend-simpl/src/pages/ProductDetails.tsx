@@ -111,7 +111,7 @@ export default function IndividualProductDetails() {
     if (!id || !variantId) return;
     try {
       const pRes = await fetch(
-        `https://product-service-jzzf.onrender.com/api/v1/products/${id}?variantId=${variantId}`,
+        `http://10.65.1.75:8063/api/v1/products/${id}?variantId=${variantId}`,
         { headers: getHeaders() },
       );
       if (pRes.ok) {
@@ -129,7 +129,7 @@ export default function IndividualProductDetails() {
   const fetchReviews = async (merchantId: string) => {
     try {
       const rRes = await fetch(
-        `https://review-service-z6zl.onrender.com/api/v1/reviews/view?productId=${id}&merchantId=${merchantId}`,
+        `http://localhost:8061/api/v1/reviews/view?productId=${id}&merchantId=${merchantId}`,
         { headers: getHeaders() },
       );
       if (rRes.ok) {
@@ -170,8 +170,8 @@ export default function IndividualProductDetails() {
 
     setIsReviewing(true);
     const url = editingReviewId
-      ? `https://review-service-z6zl.onrender.com/api/v1/reviews/update/${editingReviewId}`
-      : `https://review-service-z6zl.onrender.com/api/v1/reviews/create`;
+      ? `http://localhost:8061/api/v1/reviews/update/${editingReviewId}`
+      : `http://localhost:8061/api/v1/reviews/create`;
 
     const method = editingReviewId ? "PUT" : "POST";
     const body = editingReviewId
@@ -209,7 +209,7 @@ export default function IndividualProductDetails() {
     if (!window.confirm("Delete this review?")) return;
     try {
       const res = await fetch(
-        `https://review-service-z6zl.onrender.com/api/v1/reviews/delete/${reviewId}`,
+        `http://localhost:8061/api/v1/reviews/delete/${reviewId}`,
         {
           method: "DELETE",
           headers: getHeaders(),
